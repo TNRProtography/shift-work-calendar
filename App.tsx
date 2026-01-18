@@ -67,6 +67,15 @@ const App: React.FC = () => {
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
+  const [isTemplateModalOpen, setIsTemplateModalOpen] = useState(false);
+  const [templateForm, setTemplateForm] = useState({
+    name: '',
+    type: 'Custom' as ShiftTemplate['type'],
+    startTime: '09:00',
+    endTime: '17:00',
+    icon: '✨',
+    color: 'bg-slate-100 text-slate-700 border-slate-200'
+  });
 
   // --- Initial Load ---
   useEffect(() => {
@@ -80,6 +89,10 @@ const App: React.FC = () => {
   useEffect(() => {
     StorageService.saveShifts(shifts);
   }, [shifts]);
+
+  useEffect(() => {
+    StorageService.saveTemplates(templates);
+  }, [templates]);
 
   // --- Helpers ---
   const daysInMonth = useMemo(() => {
@@ -191,6 +204,42 @@ const App: React.FC = () => {
     setShifts(shifts.filter(s => s.id !== id));
   };
 
+  const templateColorOptions = [
+    { label: 'Slate', value: 'bg-slate-100 text-slate-700 border-slate-200' },
+    { label: 'Indigo', value: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
+    { label: 'Emerald', value: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
+    { label: 'Amber', value: 'bg-amber-100 text-amber-700 border-amber-200' },
+    { label: 'Rose', value: 'bg-rose-100 text-rose-700 border-rose-200' },
+    { label: 'Sky', value: 'bg-sky-100 text-sky-700 border-sky-200' }
+  ];
+
+  const resetTemplateForm = () => {
+    setTemplateForm({
+      name: '',
+      type: 'Custom',
+      startTime: '09:00',
+      endTime: '17:00',
+      icon: '✨',
+      color: 'bg-slate-100 text-slate-700 border-slate-200'
+    });
+  };
+
+  const handleCreateTemplate = () => {
+    if (!templateForm.name.trim()) return;
+    const newTemplate: ShiftTemplate = {
+      id: crypto.randomUUID(),
+      name: templateForm.name.trim(),
+      type: templateForm.type,
+      startTime: templateForm.startTime,
+      endTime: templateForm.endTime,
+      icon: templateForm.icon || '🗓️',
+      color: templateForm.color
+    };
+    setTemplates([...templates, newTemplate]);
+    setIsTemplateModalOpen(false);
+    resetTemplateForm();
+  };
+
   const resetForm = () => {
     setSwapped(false);
     setSwappedWith('');
@@ -287,6 +336,12 @@ const App: React.FC = () => {
               />
             ))}
           </div>
+          <button
+            onClick={() => setIsTemplateModalOpen(true)}
+            className="mt-4 w-full rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 py-3 text-[10px] font-black uppercase tracking-[0.3em] hover:border-indigo-300 hover:text-indigo-600 transition-all"
+          >
+            + Add Template
+          </button>
         </div>
 
         <div className="mt-auto pt-4 border-t border-slate-100 space-y-2">
@@ -501,6 +556,13 @@ const App: React.FC = () => {
               </button>
             ))}
             <button 
+              onClick={() => setIsTemplateModalOpen(true)}
+              className="flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 transition-all duration-300 ease-out active:scale-90"
+            >
+              <span className="text-lg font-black">+</span>
+              <span className="text-[7px] font-black uppercase mt-0.5">Template</span>
+            </button>
+            <button 
               onClick={() => ExportService.generateICS(shifts, templates)}
               className="flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl bg-slate-900 text-white border border-transparent transition-all duration-300 ease-out active:scale-90"
             >
@@ -557,6 +619,112 @@ const App: React.FC = () => {
                 </div>
               </>
             )}
+          </div>
+        </div>
+      )}
+
+      {isTemplateModalOpen && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-slate-900/70 backdrop-blur-sm">
+          <div className="bg-white rounded-[2rem] p-6 max-w-md w-full shadow-2xl border border-white/20">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <h2 className="text-lg font-black text-slate-900">New Template</h2>
+                <p className="text-[11px] font-bold text-slate-500">Create a custom shift or event template.</p>
+              </div>
+              <button
+                onClick={() => {
+                  setIsTemplateModalOpen(false);
+                  resetTemplateForm();
+                }}
+                className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 transition-all duration-300 ease-out"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Name</label>
+                <input
+                  value={templateForm.name}
+                  onChange={(e) => setTemplateForm({ ...templateForm, name: e.target.value })}
+                  placeholder="Team Meeting, Training, Event..."
+                  className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-900 focus:border-indigo-500 outline-none"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Start</label>
+                  <input
+                    type="time"
+                    value={templateForm.startTime}
+                    onChange={(e) => setTemplateForm({ ...templateForm, startTime: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-900 focus:border-indigo-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">End</label>
+                  <input
+                    type="time"
+                    value={templateForm.endTime}
+                    onChange={(e) => setTemplateForm({ ...templateForm, endTime: e.target.value })}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-900 focus:border-indigo-500 outline-none"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Icon</label>
+                  <input
+                    value={templateForm.icon}
+                    onChange={(e) => setTemplateForm({ ...templateForm, icon: e.target.value })}
+                    placeholder="✨"
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-900 focus:border-indigo-500 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Type</label>
+                  <select
+                    value={templateForm.type}
+                    onChange={(e) => {
+                      const nextType = e.target.value as ShiftTemplate['type'];
+                      setTemplateForm({
+                        ...templateForm,
+                        type: nextType,
+                        startTime: nextType === 'Sick' || nextType === 'Annual' ? '00:00' : templateForm.startTime,
+                        endTime: nextType === 'Sick' || nextType === 'Annual' ? '23:59' : templateForm.endTime
+                      });
+                    }}
+                    className="mt-1 w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-900 focus:border-indigo-500 outline-none"
+                  >
+                    <option value="Custom">Custom</option>
+                    <option value="Sick">Sick</option>
+                    <option value="Annual">Annual</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Color</label>
+                <div className="mt-2 grid grid-cols-3 gap-2">
+                  {templateColorOptions.map(option => (
+                    <button
+                      key={option.value}
+                      onClick={() => setTemplateForm({ ...templateForm, color: option.value })}
+                      className={`flex items-center justify-center py-2 rounded-xl border text-[9px] font-black uppercase tracking-widest transition-all ${option.value} ${templateForm.color === option.value ? 'ring-2 ring-indigo-500/40' : ''}`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button
+                onClick={handleCreateTemplate}
+                disabled={!templateForm.name.trim()}
+                className="w-full py-3 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-lg transition-all duration-300 ease-out hover:bg-indigo-700 disabled:bg-slate-300 disabled:text-slate-500"
+              >
+                Save Template
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -696,6 +864,18 @@ const App: React.FC = () => {
                   className="w-full py-3 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-lg transition-all duration-300 ease-out hover:bg-indigo-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
                 >
                   Save Shift
+                </button>
+              )}
+
+              {selectedShift && (
+                <button
+                  onClick={() => {
+                    deleteShift(selectedShift.id);
+                    setSelectedDate(null);
+                  }}
+                  className="w-full py-3 rounded-xl bg-rose-50 text-rose-600 font-black uppercase text-[10px] tracking-widest border border-rose-200 hover:bg-rose-100 transition-all duration-300 ease-out"
+                >
+                  Remove Entry
                 </button>
               )}
               
