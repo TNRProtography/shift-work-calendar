@@ -394,73 +394,25 @@ const App: React.FC = () => {
   };
 
   return (
-    <div className="h-full flex flex-col md:flex-row bg-slate-50 text-slate-900 overflow-hidden">
-      
-      {/* Sidebar (Desktop) */}
-      <aside className="hidden md:flex w-80 bg-white border-r border-slate-200 p-6 flex-col gap-4 shadow-sm z-10 shrink-0 h-full">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-100">
-              <CalendarIcon className="text-white w-5 h-5" />
-            </div>
-            <h1 className="text-2xl font-black tracking-tight text-slate-900">Nicole&apos;s Working Life</h1>
-          </div>
-
-        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
-          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Quick Templates</h3>
-          <div className="space-y-2">
-            {templates.map(t => (
-              <TemplateButton 
-                key={t.id} 
-                template={t} 
-                onClick={() => handleAddShift(t)} 
-              />
-            ))}
-          </div>
-          <button
-            onClick={() => setIsTemplateModalOpen(true)}
-            className="mt-4 w-full rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 py-3 text-[10px] font-black uppercase tracking-[0.3em] hover:border-indigo-300 hover:text-indigo-600 transition-all"
-          >
-            + Add Template
-          </button>
-        </div>
-
-        <div className="mt-auto pt-4 border-t border-slate-100 space-y-2">
-          <button 
-            onClick={() => ExportService.generateICS(shifts, templates)}
-            className="w-full flex items-center justify-center gap-2 bg-slate-900 text-white py-3 rounded-xl hover:bg-black transition-all font-bold shadow-lg text-sm"
-          >
-            <Download size={16} /> Bulk Export .ICS
-          </button>
-          <a
-            href={selectedShift && selectedTemplate ? ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate) : undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-bold transition-all ${
-              selectedShift && selectedTemplate
-                ? 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-600 hover:text-white'
-                : 'bg-slate-100 text-slate-400 border-slate-200 pointer-events-none'
-            }`}
-          >
-            <ExternalLink size={16} /> Sync Selected to Google
-          </a>
-        </div>
-      </aside>
-
-      {/* Main Content Area */}
-      <main className="flex-1 flex flex-col h-full overflow-hidden relative">
-        
-        {/* Top Header */}
-        <header className="h-16 md:h-20 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between shrink-0 sticky top-0 z-20">
-          <div className="flex items-center gap-3 md:gap-5">
-            <div className="flex flex-col">
-              <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-slate-400">Calendar</span>
-              <h2 className="text-sm md:text-lg font-black text-slate-900">Nicole&apos;s Working Life</h2>
+    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+      {/* Top Header */}
+      <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-3 md:py-4 sticky top-0 z-30">
+        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div className="flex flex-col md:flex-row md:items-center gap-3 md:gap-5">
+            <div className="flex items-center gap-3">
+              <div className="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-100">
+                <CalendarIcon className="text-white w-5 h-5" />
+              </div>
+              <div>
+                <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-slate-400">Calendar</span>
+                <h1 className="text-base md:text-xl font-black text-slate-900">Nicole&apos;s Working Life</h1>
+              </div>
             </div>
             <div className="hidden md:block h-8 w-px bg-slate-200" />
             <div className="flex items-center gap-2 md:gap-4">
-              <h3 className="text-base md:text-xl font-black text-slate-900 min-w-[100px]">
+              <h2 className="text-sm md:text-xl font-black text-slate-900 min-w-[100px]">
                 {format(currentMonth, 'MMMM yyyy')}
-              </h3>
+              </h2>
               <div className="flex items-center bg-slate-100 rounded-xl p-1">
                 <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-700">
                   <ChevronLeft size={16} />
@@ -500,9 +452,9 @@ const App: React.FC = () => {
                 <Settings size={16} />
               </button>
               {isSyncMenuOpen && (
-                <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 text-slate-700 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-2xl shadow-xl p-4 text-slate-700 max-h-[70vh] overflow-y-auto custom-scrollbar">
                   <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Sync</h4>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Sync</h3>
                     <span className={`text-[10px] font-bold ${isSyncing ? 'text-indigo-600' : 'text-slate-400'}`}>
                       {isSyncing ? 'Working...' : 'Ready'}
                     </span>
@@ -529,7 +481,7 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="border-t border-slate-100 pt-3 mb-3">
-                    <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Appearance</h4>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Appearance</h3>
                     <button
                       onClick={() => handleToggleSetting('darkMode')}
                       className="w-full flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:border-indigo-200 hover:text-indigo-600 transition-all"
@@ -556,7 +508,7 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="border-t border-slate-100 pt-3 mb-3">
-                    <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Preferences</h4>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Preferences</h3>
                     <div className="space-y-2">
                       <button
                         onClick={() => handleToggleSetting('weekStartsOnMonday')}
@@ -590,7 +542,7 @@ const App: React.FC = () => {
                   </div>
 
                   <div className="border-t border-slate-100 pt-3">
-                    <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Data</h4>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Data</h3>
                     <button
                       onClick={handleFactoryReset}
                       className="w-full py-2 rounded-xl border border-rose-200 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-all"
@@ -602,10 +554,57 @@ const App: React.FC = () => {
               )}
             </div>
           </div>
-        </header>
+        </div>
+      </header>
 
-        {/* View Content */}
-        <div className={`flex-1 overflow-hidden flex flex-col ${contentPadding}`}>
+      <div className="flex-1 flex flex-col md:flex-row overflow-hidden min-h-0">
+        {/* Sidebar (Desktop) */}
+        <aside className="hidden md:flex w-80 bg-white border-r border-slate-200 p-6 flex-col gap-4 shadow-sm z-10 shrink-0 h-full">
+          <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
+          <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Quick Templates</h3>
+          <div className="space-y-2">
+            {templates.map(t => (
+              <TemplateButton 
+                key={t.id} 
+                template={t} 
+                onClick={() => handleAddShift(t)} 
+              />
+            ))}
+          </div>
+          <button
+            onClick={() => setIsTemplateModalOpen(true)}
+            className="mt-4 w-full rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 py-3 text-[10px] font-black uppercase tracking-[0.3em] hover:border-indigo-300 hover:text-indigo-600 transition-all"
+          >
+            + Add Template
+          </button>
+        </div>
+
+        <div className="mt-auto pt-4 border-t border-slate-100 space-y-2">
+          <button 
+            onClick={() => ExportService.generateICS(shifts, templates)}
+            className="w-full flex items-center justify-center gap-2 bg-slate-900 text-white py-3 rounded-xl hover:bg-black transition-all font-bold shadow-lg text-sm"
+          >
+            <Download size={16} /> Bulk Export .ICS
+          </button>
+          <a
+            href={selectedShift && selectedTemplate ? ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate) : undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-bold transition-all ${
+              selectedShift && selectedTemplate
+                ? 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-600 hover:text-white'
+                : 'bg-slate-100 text-slate-400 border-slate-200 pointer-events-none'
+            }`}
+          >
+            <ExternalLink size={16} /> Sync Selected to Google
+          </a>
+        </div>
+        </aside>
+
+        {/* Main Content Area */}
+        <main className="flex-1 flex flex-col h-full overflow-hidden relative min-h-0">
+          {/* View Content */}
+          <div className={`flex-1 overflow-hidden flex flex-col ${contentPadding}`}>
           {view === 'Month' ? (
             <div className="flex-1 flex flex-col bg-white rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden transition-all duration-300 ease-out">
               <div className="calendar-grid border-b border-slate-100 bg-slate-50/80 shrink-0">
@@ -750,51 +749,52 @@ const App: React.FC = () => {
                 })}
             </div>
           )}
-        </div>
-
-        {/* Mobile Template Selector Bar */}
-      <div className="md:hidden bg-white border-t border-slate-200 p-2 shrink-0 z-30">
-        <div className="flex items-center justify-around gap-1 overflow-x-auto custom-scrollbar py-1">
-          {templates.map(t => (
-            <button
-              key={t.id}
-              onClick={() => handleAddShift(t)}
-              className={`flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border transition-all duration-300 ease-out ${t.color.split(' ')[0]} ${t.color.split(' ')[1]} border-transparent active:scale-90`}
-            >
-                <span className="text-xl">{t.icon}</span>
-                <span className="text-[7px] font-black uppercase mt-0.5 tracking-tighter">{t.name.split(' ')[0]}</span>
-              </button>
-            ))}
-            <button 
-              onClick={() => setIsTemplateModalOpen(true)}
-              className="flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 transition-all duration-300 ease-out active:scale-90"
-            >
-              <span className="text-lg font-black">+</span>
-              <span className="text-[7px] font-black uppercase mt-0.5">Template</span>
-            </button>
-            <button 
-              onClick={() => ExportService.generateICS(shifts, templates)}
-              className="flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl bg-slate-900 text-white border border-transparent transition-all duration-300 ease-out active:scale-90"
-            >
-              <Download size={18} />
-              <span className="text-[7px] font-black uppercase mt-0.5">Save</span>
-            </button>
-            <a
-              href={selectedShift && selectedTemplate ? ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate) : undefined}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={`flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border transition-all duration-300 ease-out active:scale-90 ${
-                selectedShift && selectedTemplate
-                  ? 'bg-white text-indigo-600 border-indigo-100'
-                  : 'bg-slate-100 text-slate-400 border-slate-200 pointer-events-none'
-              }`}
-            >
-              <ExternalLink size={18} />
-              <span className="text-[7px] font-black uppercase mt-0.5">Sync</span>
-            </a>
           </div>
-        </div>
-      </main>
+
+          {/* Mobile Template Selector Bar */}
+          <div className="md:hidden bg-white border-t border-slate-200 p-2 shrink-0 z-30">
+            <div className="flex items-center justify-around gap-1 overflow-x-auto custom-scrollbar py-1">
+              {templates.map(t => (
+                <button
+                  key={t.id}
+                  onClick={() => handleAddShift(t)}
+                  className={`flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border transition-all duration-300 ease-out ${t.color.split(' ')[0]} ${t.color.split(' ')[1]} border-transparent active:scale-90`}
+                >
+                  <span className="text-xl">{t.icon}</span>
+                  <span className="text-[7px] font-black uppercase mt-0.5 tracking-tighter">{t.name.split(' ')[0]}</span>
+                </button>
+              ))}
+              <button 
+                onClick={() => setIsTemplateModalOpen(true)}
+                className="flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 transition-all duration-300 ease-out active:scale-90"
+              >
+                <span className="text-lg font-black">+</span>
+                <span className="text-[7px] font-black uppercase mt-0.5">Template</span>
+              </button>
+              <button 
+                onClick={() => ExportService.generateICS(shifts, templates)}
+                className="flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl bg-slate-900 text-white border border-transparent transition-all duration-300 ease-out active:scale-90"
+              >
+                <Download size={18} />
+                <span className="text-[7px] font-black uppercase mt-0.5">Save</span>
+              </button>
+              <a
+                href={selectedShift && selectedTemplate ? ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate) : undefined}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={`flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border transition-all duration-300 ease-out active:scale-90 ${
+                  selectedShift && selectedTemplate
+                    ? 'bg-white text-indigo-600 border-indigo-100'
+                    : 'bg-slate-100 text-slate-400 border-slate-200 pointer-events-none'
+                }`}
+              >
+                <ExternalLink size={18} />
+                <span className="text-[7px] font-black uppercase mt-0.5">Sync</span>
+              </a>
+            </div>
+          </div>
+        </main>
+      </div>
 
       {/* Warnings & Detail Popover (Desktop + Mobile overlay) */}
       {(overwriteWarning || restWarning) && (
