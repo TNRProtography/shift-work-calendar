@@ -65,6 +65,8 @@ const App: React.FC = () => {
   const [isExtraHoursChecked, setIsExtraHoursChecked] = useState(false);
   const [extraHoursType, setExtraHoursType] = useState<'before' | 'after'>('after');
   const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [pendingTemplateId, setPendingTemplateId] = useState<string | null>(null);
 
   // --- Initial Load ---
   useEffect(() => {
@@ -180,15 +182,9 @@ const App: React.FC = () => {
 
   const handleAddShift = (template: ShiftTemplate) => {
     if (!selectedDate) return;
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const existing = getShiftForDateStr(dateStr);
-
-    if (existing) {
-      setOverwriteWarning({ date: dateStr, existing, pendingTemplateId: template.id });
-      return;
-    }
-
-    executeAddShift(dateStr, template.id);
+    setPendingTemplateId(template.id);
+    setIsEditing(true);
+    setIsDetailsExpanded(true);
   };
 
   const deleteShift = (id: string) => {
@@ -204,6 +200,69 @@ const App: React.FC = () => {
 
   const selectedShift = selectedDate ? getShiftForDate(selectedDate) : null;
   const selectedTemplate = selectedShift ? templates.find(t => t.id === selectedShift.templateId) : null;
+  const pendingTemplate = pendingTemplateId ? templates.find(t => t.id === pendingTemplateId) : null;
+
+  useEffect(() => {
+    if (!selectedDate) return;
+    if (selectedShift) {
+      setPendingTemplateId(selectedShift.templateId);
+      setSwapped(selectedShift.isSwapped);
+      setSwappedWith(selectedShift.swappedWith ?? '');
+      setIsExtraHoursChecked(selectedShift.extraHours !== 'none');
+      setExtraHoursType(selectedShift.extraHours === 'before' ? 'before' : 'after');
+      setIsEditing(false);
+      setIsDetailsExpanded(true);
+    } else {
+      setPendingTemplateId(null);
+      resetForm();
+      setIsEditing(true);
+      setIsDetailsExpanded(true);
+    }
+  }, [selectedDate, selectedShift]);
+
+  const handleSaveShift = () => {
+    if (!selectedDate || !pendingTemplateId) return;
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const existing = getShiftForDateStr(dateStr);
+    const finalExtraHours: ExtraHoursType = isExtraHoursChecked ? extraHoursType : 'none';
+    const restConflict = checkRestPeriod(dateStr, pendingTemplateId, shifts.filter(s => s.date !== dateStr));
+
+    if (restConflict) {
+      setRestWarning({
+        date: dateStr,
+        pendingTemplateId,
+        gapMinutes: restConflict.gap,
+        conflictType: restConflict.type,
+        neighborShift: restConflict.neighbor
+      });
+      return;
+    }
+
+    if (existing) {
+      const updatedShift: ShiftEntry = {
+        ...existing,
+        templateId: pendingTemplateId,
+        isSwapped: swapped,
+        swappedWith: swapped ? swappedWith : undefined,
+        extraHours: finalExtraHours
+      };
+      setShifts(shifts.map(s => (s.id === existing.id ? updatedShift : s)));
+    } else {
+      const newShift: ShiftEntry = {
+        id: crypto.randomUUID(),
+        templateId: pendingTemplateId,
+        date: dateStr,
+        isSwapped: swapped,
+        swappedWith: swapped ? swappedWith : undefined,
+        extraHours: finalExtraHours
+      };
+      setShifts([...shifts, newShift]);
+    }
+
+    setIsEditing(false);
+    setOverwriteWarning(null);
+    setRestWarning(null);
+  };
 
   return (
     <div className="h-full flex flex-col md:flex-row bg-slate-50 text-slate-900 overflow-hidden">
@@ -237,6 +296,18 @@ const App: React.FC = () => {
           >
             <Download size={16} /> Bulk Export .ICS
           </button>
+          <a
+            href={selectedShift && selectedTemplate ? ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate) : undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-bold transition-all ${
+              selectedShift && selectedTemplate
+                ? 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-600 hover:text-white'
+                : 'bg-slate-100 text-slate-400 border-slate-200 pointer-events-none'
+            }`}
+          >
+            <ExternalLink size={16} /> Sync Selected to Google
+          </a>
         </div>
       </aside>
 
@@ -436,6 +507,19 @@ const App: React.FC = () => {
               <Download size={18} />
               <span className="text-[7px] font-black uppercase mt-0.5">Save</span>
             </button>
+            <a
+              href={selectedShift && selectedTemplate ? ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate) : undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border transition-all duration-300 ease-out active:scale-90 ${
+                selectedShift && selectedTemplate
+                  ? 'bg-white text-indigo-600 border-indigo-100'
+                  : 'bg-slate-100 text-slate-400 border-slate-200 pointer-events-none'
+              }`}
+            >
+              <ExternalLink size={18} />
+              <span className="text-[7px] font-black uppercase mt-0.5">Sync</span>
+            </a>
           </div>
         </div>
       </main>
@@ -487,6 +571,26 @@ const App: React.FC = () => {
                 <span className="text-xs font-black text-slate-900">{format(selectedDate, 'EEEE, MMM dd')}</span>
               </div>
               <div className="flex items-center gap-1">
+                {selectedShift && (
+                  <button
+                    onClick={() => {
+                      if (isEditing && selectedShift) {
+                        setPendingTemplateId(selectedShift.templateId);
+                        setSwapped(selectedShift.isSwapped);
+                        setSwappedWith(selectedShift.swappedWith ?? '');
+                        setIsExtraHoursChecked(selectedShift.extraHours !== 'none');
+                        setExtraHoursType(selectedShift.extraHours === 'before' ? 'before' : 'after');
+                        setIsEditing(false);
+                      } else {
+                        setIsEditing(true);
+                        setIsDetailsExpanded(true);
+                      }
+                    }}
+                    className="px-2 py-1 text-[9px] font-black uppercase tracking-widest text-indigo-600 hover:bg-indigo-50 rounded-full transition-all duration-300 ease-out"
+                  >
+                    {isEditing ? 'Cancel' : 'Edit'}
+                  </button>
+                )}
                 <button
                   onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
                   className="md:hidden p-1.5 hover:bg-slate-100 rounded-full text-slate-400 transition-all duration-300 ease-out"
@@ -498,16 +602,45 @@ const App: React.FC = () => {
               </div>
             </div>
             
+            <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3 mb-3">
+              <div className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Shift</div>
+              {pendingTemplate ? (
+                <div className="mt-2 flex items-center gap-2">
+                  <span className="text-xl">{pendingTemplate.icon}</span>
+                  <div className="text-xs font-black text-slate-900">{pendingTemplate.name}</div>
+                </div>
+              ) : (
+                <div className="mt-2 text-[10px] font-bold text-slate-500">No shift selected yet.</div>
+              )}
+            </div>
+
             <div className={`space-y-3 transition-all duration-300 ease-out overflow-hidden md:max-h-none md:opacity-100 ${isDetailsExpanded ? 'max-h-[60vh] opacity-100 overflow-y-auto pr-1' : 'max-h-0 opacity-0 md:opacity-100'}`}>
+              <div className="space-y-2">
+                <label className="text-[9px] font-black uppercase tracking-[0.2em] text-slate-400">Shift Selection</label>
+                <select
+                  value={pendingTemplateId ?? ''}
+                  onChange={(e) => setPendingTemplateId(e.target.value || null)}
+                  disabled={!isEditing}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-900 focus:border-indigo-500 outline-none disabled:bg-slate-50 disabled:text-slate-400"
+                >
+                  <option value="">Select a shift</option>
+                  {templates.map((template) => (
+                    <option key={template.id} value={template.id}>
+                      {template.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               <div 
-                onClick={() => setIsExtraHoursChecked(!isExtraHoursChecked)}
-                className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-300 ease-out ${isExtraHoursChecked ? 'bg-rose-50 border-rose-200 shadow-sm' : 'bg-slate-50 border-slate-100'}`}
+                onClick={() => isEditing && setIsExtraHoursChecked(!isExtraHoursChecked)}
+                className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-300 ease-out ${isExtraHoursChecked ? 'bg-rose-50 border-rose-200 shadow-sm' : 'bg-slate-50 border-slate-100'} ${isEditing ? 'cursor-pointer' : 'opacity-70'}`}
               >
                 <div className="flex items-center gap-2">
                   <div className={`w-5 h-5 rounded flex items-center justify-center transition-all ${isExtraHoursChecked ? 'bg-rose-600 text-white shadow-sm' : 'bg-white border border-slate-300 text-transparent'}`}>
                      <CheckCircle2 size={12} strokeWidth={4} />
                   </div>
-                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-tight flex items-center gap-2 cursor-pointer">
+                  <label className="text-[10px] font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
                     <Zap size={12} className={isExtraHoursChecked ? "text-rose-600" : "text-slate-400"} />
                     Extra Hours
                   </label>
@@ -519,8 +652,8 @@ const App: React.FC = () => {
                   {['before', 'after'].map((type) => (
                     <button
                       key={type}
-                      onClick={() => setExtraHoursType(type as 'before' | 'after')}
-                      className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all duration-300 ease-out ${extraHoursType === type ? 'bg-white shadow text-rose-600' : 'text-slate-500'}`}
+                      onClick={() => isEditing && setExtraHoursType(type as 'before' | 'after')}
+                      className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all duration-300 ease-out ${extraHoursType === type ? 'bg-white shadow text-rose-600' : 'text-slate-500'} ${isEditing ? '' : 'pointer-events-none'}`}
                     >
                       {type}
                     </button>
@@ -529,14 +662,14 @@ const App: React.FC = () => {
               )}
 
               <div 
-                onClick={() => setSwapped(!swapped)}
-                className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-300 ease-out ${swapped ? 'bg-amber-50 border-amber-200 shadow-sm' : 'bg-slate-50 border-slate-100'}`}
+                onClick={() => isEditing && setSwapped(!swapped)}
+                className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-300 ease-out ${swapped ? 'bg-amber-50 border-amber-200 shadow-sm' : 'bg-slate-50 border-slate-100'} ${isEditing ? 'cursor-pointer' : 'opacity-70'}`}
               >
                 <div className="flex items-center gap-2">
                     <div className={`w-5 h-5 rounded flex items-center justify-center transition-all ${swapped ? 'bg-amber-600 text-white shadow-sm' : 'bg-white border border-slate-300 text-transparent'}`}>
                        <CheckCircle2 size={12} strokeWidth={4} />
                     </div>
-                    <label className="text-[10px] font-black text-slate-800 uppercase tracking-tight flex items-center gap-2 cursor-pointer">
+                    <label className="text-[10px] font-black text-slate-800 uppercase tracking-tight flex items-center gap-2">
                       <Users size={12} className={swapped ? "text-amber-600" : "text-slate-400"} />
                       Swapped?
                     </label>
@@ -549,25 +682,25 @@ const App: React.FC = () => {
                     type="text" 
                     placeholder="Who with? (High Contrast Text)"
                     value={swappedWith}
-                    onChange={(e) => setSwappedWith(e.target.value)}
-                    className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:border-indigo-500 outline-none placeholder:text-slate-300"
+                    onChange={(e) => isEditing && setSwappedWith(e.target.value)}
+                    disabled={!isEditing}
+                    className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:border-indigo-500 outline-none placeholder:text-slate-300 disabled:bg-slate-50"
                   />
                 </div>
               )}
 
-              {selectedShift && selectedTemplate && (
-                <a
-                  href={ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-lg transition-all duration-300 ease-out hover:bg-indigo-700"
+              {isEditing && (
+                <button
+                  onClick={handleSaveShift}
+                  disabled={!pendingTemplateId}
+                  className="w-full py-3 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-lg transition-all duration-300 ease-out hover:bg-indigo-700 disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none"
                 >
-                  <ExternalLink size={14} /> Sync to Google Calendar
-                </a>
+                  Save Shift
+                </button>
               )}
               
               <div className="text-[8px] text-slate-400 font-black uppercase text-center bg-slate-50 p-2 rounded-xl">
-                Apply a shift template to save
+                Select a shift, adjust flags, then save.
               </div>
             </div>
           </div>
