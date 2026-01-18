@@ -1,8 +1,9 @@
 
-import { ShiftEntry, ShiftTemplate } from '../types';
+import { AppSettings, ShiftEntry, ShiftTemplate } from '../types';
 
 const STORAGE_KEY_SHIFTS = 'shiftflow_entries_v1';
 const STORAGE_KEY_TEMPLATES = 'shiftflow_templates_v1';
+const STORAGE_KEY_SETTINGS = 'shiftflow_settings_v1';
 const STORAGE_KEY_LAST_SYNC = 'shiftflow_last_sync_v1';
 const KV_NAMESPACE = 'CAL_KV';
 
@@ -58,8 +59,18 @@ export const StorageService = {
     persistToKV(STORAGE_KEY_TEMPLATES, templates);
   },
 
+  saveSettings: (settings: AppSettings) => {
+    persistLocal(STORAGE_KEY_SETTINGS, settings);
+    persistToKV(STORAGE_KEY_SETTINGS, settings);
+  },
+
   getTemplates: (defaults: ShiftTemplate[]): ShiftTemplate[] => {
     const data = localStorage.getItem(STORAGE_KEY_TEMPLATES);
+    return data ? JSON.parse(data) : defaults;
+  },
+
+  getSettings: (defaults: AppSettings): AppSettings => {
+    const data = localStorage.getItem(STORAGE_KEY_SETTINGS);
     return data ? JSON.parse(data) : defaults;
   },
 
@@ -67,30 +78,50 @@ export const StorageService = {
     return localStorage.getItem(STORAGE_KEY_LAST_SYNC);
   },
 
-  pushToKV: (shifts: ShiftEntry[], templates: ShiftTemplate[]) => {
+  pushToKV: (shifts: ShiftEntry[], templates: ShiftTemplate[], settings: AppSettings) => {
     persistToKV(STORAGE_KEY_SHIFTS, shifts);
     persistToKV(STORAGE_KEY_TEMPLATES, templates);
+    persistToKV(STORAGE_KEY_SETTINGS, settings);
     setLastSynced(new Date().toISOString());
   },
 
-  pullFromKV: async (defaults: ShiftTemplate[]) => {
-    const [remoteShifts, remoteTemplates] = await Promise.all([
+  pullFromKV: async (defaults: ShiftTemplate[], settingsDefaults: AppSettings) => {
+    const [remoteShifts, remoteTemplates, remoteSettings] = await Promise.all([
       fetchFromKV(STORAGE_KEY_SHIFTS),
-      fetchFromKV(STORAGE_KEY_TEMPLATES)
+      fetchFromKV(STORAGE_KEY_TEMPLATES),
+      fetchFromKV(STORAGE_KEY_SETTINGS)
     ]);
 
     const shifts = Array.isArray(remoteShifts) ? remoteShifts as ShiftEntry[] : [];
     const templates = Array.isArray(remoteTemplates) && remoteTemplates.length > 0
       ? remoteTemplates as ShiftTemplate[]
       : defaults;
+    const settings = remoteSettings && typeof remoteSettings === 'object'
+      ? remoteSettings as AppSettings
+      : settingsDefaults;
 
-    if (shifts.length === 0 && (!Array.isArray(remoteTemplates) || remoteTemplates.length === 0)) {
+    if (
+      shifts.length === 0 &&
+      (!Array.isArray(remoteTemplates) || remoteTemplates.length === 0) &&
+      !remoteSettings
+    ) {
       return null;
     }
 
     persistLocal(STORAGE_KEY_SHIFTS, shifts);
     persistLocal(STORAGE_KEY_TEMPLATES, templates);
+    persistLocal(STORAGE_KEY_SETTINGS, settings);
     setLastSynced(new Date().toISOString());
-    return { shifts, templates };
+    return { shifts, templates, settings };
+  },
+
+  resetAll: (defaults: { templates: ShiftTemplate[]; settings: AppSettings }) => {
+    localStorage.removeItem(STORAGE_KEY_SHIFTS);
+    localStorage.removeItem(STORAGE_KEY_TEMPLATES);
+    localStorage.removeItem(STORAGE_KEY_SETTINGS);
+    localStorage.removeItem(STORAGE_KEY_LAST_SYNC);
+    persistToKV(STORAGE_KEY_SHIFTS, []);
+    persistToKV(STORAGE_KEY_TEMPLATES, defaults.templates);
+    persistToKV(STORAGE_KEY_SETTINGS, defaults.settings);
   }
 };

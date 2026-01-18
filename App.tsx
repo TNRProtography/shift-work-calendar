@@ -16,7 +16,8 @@ import {
   subDays,
   differenceInMinutes,
   addHours,
-  subHours
+  subHours,
+  isWeekend
 } from 'date-fns';
 import { 
   Calendar as CalendarIcon, 
@@ -36,8 +37,8 @@ import {
   Settings
 } from 'lucide-react';
 
-import { ShiftEntry, ShiftTemplate, ViewType, ExtraHoursType } from './types';
-import { DEFAULT_TEMPLATES, DAYS } from './constants';
+import { AppSettings, ShiftEntry, ShiftTemplate, ViewType, ExtraHoursType, SkinTheme } from './types';
+import { DEFAULT_TEMPLATES, DAYS, DEFAULT_SETTINGS } from './constants';
 import { StorageService } from './services/storageService';
 import { ExportService } from './services/exportService';
 import { TemplateButton } from './components/TemplateButton';
@@ -49,6 +50,7 @@ const App: React.FC = () => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
   const [view, setView] = useState<ViewType>('Month');
+  const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   
   // Modals & Warnings
   const [overwriteWarning, setOverwriteWarning] = useState<{ date: string; existing: ShiftEntry; pendingTemplateId: string } | null>(null);
@@ -86,8 +88,10 @@ const App: React.FC = () => {
   useEffect(() => {
     const savedShifts = StorageService.getShifts();
     const savedTemplates = StorageService.getTemplates(DEFAULT_TEMPLATES);
+    const savedSettings = StorageService.getSettings(DEFAULT_SETTINGS);
     setShifts(savedShifts);
     setTemplates(savedTemplates);
+    setSettings(savedSettings);
     setLastSynced(StorageService.getLastSynced());
   }, []);
 
@@ -100,10 +104,23 @@ const App: React.FC = () => {
     StorageService.saveTemplates(templates);
   }, [templates]);
 
+  useEffect(() => {
+    StorageService.saveSettings(settings);
+  }, [settings]);
+
+  useEffect(() => {
+    const skinClass = `skin-${settings.skin}`;
+    document.body.classList.remove('skin-default', 'skin-sunflower', 'skin-black-dog', 'skin-nursing');
+    document.body.classList.add(skinClass);
+    document.body.classList.toggle('dark', settings.darkMode);
+    document.body.classList.toggle('reduce-motion', settings.reduceMotion);
+  }, [settings]);
+
   // --- Helpers ---
+  const weekStartsOn = settings.weekStartsOnMonday ? 1 : 0;
   const daysInMonth = useMemo(() => {
-    const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn: 0 });
-    const end = endOfWeek(endOfMonth(currentMonth), { weekStartsOn: 0 });
+    const start = startOfWeek(startOfMonth(currentMonth), { weekStartsOn });
+    const end = endOfWeek(endOfMonth(currentMonth), { weekStartsOn });
     const interval = eachDayOfInterval({ start, end });
     
     // Ensure we always have exactly 42 days (6 weeks) for a consistent grid
@@ -111,7 +128,16 @@ const App: React.FC = () => {
       interval.push(addDays(interval[interval.length - 1], 1));
     }
     return interval;
-  }, [currentMonth]);
+  }, [currentMonth, weekStartsOn]);
+
+  const orderedDays = useMemo(() => {
+    if (!settings.weekStartsOnMonday) return DAYS;
+    return [...DAYS.slice(1), DAYS[0]];
+  }, [settings.weekStartsOnMonday]);
+
+  const contentPadding = settings.compactMode
+    ? 'p-1 md:p-2 lg:p-3'
+    : 'p-2 md:p-4 lg:p-6';
 
   const getShiftForDateStr = useCallback((dateStr: string) => {
     return shifts.find(s => s.date === dateStr);
@@ -219,6 +245,13 @@ const App: React.FC = () => {
     { label: 'Sky', value: 'bg-sky-100 text-sky-700 border-sky-200' }
   ];
 
+  const skinOptions: { id: SkinTheme; label: string; description: string }[] = [
+    { id: 'default', label: 'Default', description: 'Clean slate background.' },
+    { id: 'sunflower', label: 'Sunflower', description: 'Bright petals with warm accents.' },
+    { id: 'black-dog', label: 'Black Dog', description: 'Playful paw prints in ink.' },
+    { id: 'nursing', label: 'Nursing', description: 'Calm clinical pattern with care icons.' }
+  ];
+
   const resetTemplateForm = () => {
     setTemplateForm({
       name: '',
@@ -321,7 +354,7 @@ const App: React.FC = () => {
 
   const handleSyncNow = () => {
     setIsSyncing(true);
-    StorageService.pushToKV(shifts, templates);
+    StorageService.pushToKV(shifts, templates, settings);
     const now = new Date().toISOString();
     setLastSynced(now);
     setSyncMessage('Synced to CAL_KV.');
@@ -330,16 +363,34 @@ const App: React.FC = () => {
 
   const handlePullFromCloud = async () => {
     setIsSyncing(true);
-    const result = await StorageService.pullFromKV(DEFAULT_TEMPLATES);
+    const result = await StorageService.pullFromKV(DEFAULT_TEMPLATES, DEFAULT_SETTINGS);
     if (result) {
       setShifts(result.shifts);
       setTemplates(result.templates);
+      setSettings(result.settings);
       setSyncMessage('Loaded latest data from CAL_KV.');
       setLastSynced(StorageService.getLastSynced());
     } else {
       setSyncMessage('No cloud data found yet.');
     }
     setTimeout(() => setIsSyncing(false), 300);
+  };
+
+  const handleToggleSetting = (key: keyof AppSettings) => {
+    setSettings((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleSkinChange = (skin: SkinTheme) => {
+    setSettings((prev) => ({ ...prev, skin }));
+  };
+
+  const handleFactoryReset = () => {
+    StorageService.resetAll({ templates: DEFAULT_TEMPLATES, settings: DEFAULT_SETTINGS });
+    setShifts([]);
+    setTemplates(DEFAULT_TEMPLATES);
+    setSettings(DEFAULT_SETTINGS);
+    setLastSynced(null);
+    setSyncMessage('Factory reset complete.');
   };
 
   return (
@@ -449,7 +500,7 @@ const App: React.FC = () => {
                 <Settings size={16} />
               </button>
               {isSyncMenuOpen && (
-                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 text-slate-700">
+                <div className="absolute right-0 mt-2 w-80 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 text-slate-700 max-h-[70vh] overflow-y-auto custom-scrollbar">
                   <div className="flex items-center justify-between mb-2">
                     <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Sync</h4>
                     <span className={`text-[10px] font-bold ${isSyncing ? 'text-indigo-600' : 'text-slate-400'}`}>
@@ -462,7 +513,7 @@ const App: React.FC = () => {
                   {syncMessage && (
                     <p className="text-[11px] text-indigo-600 font-semibold mb-3">{syncMessage}</p>
                   )}
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-2 mb-4">
                     <button
                       onClick={handleSyncNow}
                       className="w-full py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-all"
@@ -476,6 +527,77 @@ const App: React.FC = () => {
                       Pull from CAL_KV
                     </button>
                   </div>
+
+                  <div className="border-t border-slate-100 pt-3 mb-3">
+                    <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Appearance</h4>
+                    <button
+                      onClick={() => handleToggleSetting('darkMode')}
+                      className="w-full flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                    >
+                      <span>Dark mode</span>
+                      <span>{settings.darkMode ? 'On' : 'Off'}</span>
+                    </button>
+                    <div className="mt-3 space-y-2">
+                      {skinOptions.map((option) => (
+                        <button
+                          key={option.id}
+                          onClick={() => handleSkinChange(option.id)}
+                          className={`w-full flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition-all ${settings.skin === option.id ? 'border-indigo-300 bg-indigo-50/60' : 'border-slate-200 hover:border-indigo-200'}`}
+                          aria-pressed={settings.skin === option.id}
+                        >
+                          <span className="skin-swatch" data-skin={option.id} />
+                          <span>
+                            <span className="block text-xs font-bold text-slate-700">{option.label}</span>
+                            <span className="block text-[11px] text-slate-500">{option.description}</span>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3 mb-3">
+                    <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Preferences</h4>
+                    <div className="space-y-2">
+                      <button
+                        onClick={() => handleToggleSetting('weekStartsOnMonday')}
+                        className="w-full flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                      >
+                        <span>Week starts on Monday</span>
+                        <span>{settings.weekStartsOnMonday ? 'On' : 'Off'}</span>
+                      </button>
+                      <button
+                        onClick={() => handleToggleSetting('highlightWeekends')}
+                        className="w-full flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                      >
+                        <span>Highlight weekends</span>
+                        <span>{settings.highlightWeekends ? 'On' : 'Off'}</span>
+                      </button>
+                      <button
+                        onClick={() => handleToggleSetting('compactMode')}
+                        className="w-full flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                      >
+                        <span>Compact layout</span>
+                        <span>{settings.compactMode ? 'On' : 'Off'}</span>
+                      </button>
+                      <button
+                        onClick={() => handleToggleSetting('reduceMotion')}
+                        className="w-full flex items-center justify-between rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold text-slate-600 hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                      >
+                        <span>Reduce motion</span>
+                        <span>{settings.reduceMotion ? 'On' : 'Off'}</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-slate-100 pt-3">
+                    <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Data</h4>
+                    <button
+                      onClick={handleFactoryReset}
+                      className="w-full py-2 rounded-xl border border-rose-200 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-all"
+                    >
+                      Factory reset
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -483,15 +605,23 @@ const App: React.FC = () => {
         </header>
 
         {/* View Content */}
-        <div className="flex-1 overflow-hidden flex flex-col p-2 md:p-4 lg:p-6">
+        <div className={`flex-1 overflow-hidden flex flex-col ${contentPadding}`}>
           {view === 'Month' ? (
             <div className="flex-1 flex flex-col bg-white rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden transition-all duration-300 ease-out">
               <div className="calendar-grid border-b border-slate-100 bg-slate-50/80 shrink-0">
-                {DAYS.map(day => (
-                  <div key={day} className="py-2 md:py-4 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] border-r border-slate-100 last:border-0">
-                    {day}
-                  </div>
-                ))}
+                {orderedDays.map(day => {
+                  const isWeekendHeader = day === 'Sat' || day === 'Sun';
+                  return (
+                    <div
+                      key={day}
+                      className={`py-2 md:py-4 text-center text-[9px] font-black uppercase tracking-[0.15em] border-r border-slate-100 last:border-0 ${
+                        settings.highlightWeekends && isWeekendHeader ? 'text-rose-500' : 'text-slate-500'
+                      }`}
+                    >
+                      {day}
+                    </div>
+                  );
+                })}
               </div>
               <div className="grid grid-cols-7 grid-rows-6 flex-1">
                 {daysInMonth.map((date, idx) => {
@@ -500,6 +630,7 @@ const App: React.FC = () => {
                   const isToday = isSameDay(date, new Date());
                   const isCurrentMonth = isSameMonth(date, currentMonth);
                   const isSelected = selectedDate && isSameDay(date, selectedDate);
+                  const isWeekendDay = isWeekend(date);
 
                   return (
                     <div 
@@ -508,6 +639,7 @@ const App: React.FC = () => {
                       className={`
                         p-1 md:p-2 border-r border-b border-slate-100 cursor-pointer group transition-all duration-300 ease-out relative flex flex-col items-center justify-between
                         ${!isCurrentMonth ? 'bg-slate-50/40 opacity-20' : 'bg-white hover:bg-indigo-50/40'}
+                        ${settings.highlightWeekends && isWeekendDay && isCurrentMonth ? 'bg-rose-50/40' : ''}
                         ${isSelected ? 'ring-2 md:ring-4 ring-inset ring-indigo-500/20 bg-indigo-50/30 z-10' : ''}
                       `}
                     >

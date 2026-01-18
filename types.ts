@@ -31,3 +31,14 @@ export interface AppState {
   selectedDate: string;
   view: ViewType;
 }
+
+export type SkinTheme = 'default' | 'sunflower' | 'black-dog' | 'nursing';
+
+export interface AppSettings {
+  darkMode: boolean;
+  skin: SkinTheme;
+  weekStartsOnMonday: boolean;
+  highlightWeekends: boolean;
+  compactMode: boolean;
+  reduceMotion: boolean;
+}
