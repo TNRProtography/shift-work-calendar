@@ -64,6 +64,7 @@ const App: React.FC = () => {
   const [swappedWith, setSwappedWith] = useState('');
   const [isExtraHoursChecked, setIsExtraHoursChecked] = useState(false);
   const [extraHoursType, setExtraHoursType] = useState<'before' | 'after'>('after');
+  const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
 
   // --- Initial Load ---
   useEffect(() => {
@@ -201,6 +202,9 @@ const App: React.FC = () => {
     setExtraHoursType('after');
   };
 
+  const selectedShift = selectedDate ? getShiftForDate(selectedDate) : null;
+  const selectedTemplate = selectedShift ? templates.find(t => t.id === selectedShift.templateId) : null;
+
   return (
     <div className="h-full flex flex-col md:flex-row bg-slate-50 text-slate-900 overflow-hidden">
       
@@ -277,7 +281,7 @@ const App: React.FC = () => {
         {/* View Content */}
         <div className="flex-1 overflow-hidden flex flex-col p-2 md:p-4 lg:p-6">
           {view === 'Month' ? (
-            <div className="flex-1 flex flex-col bg-white rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden">
+            <div className="flex-1 flex flex-col bg-white rounded-[1.5rem] md:rounded-[2.5rem] shadow-xl border border-slate-200 overflow-hidden transition-all duration-300 ease-out">
               <div className="calendar-grid border-b border-slate-100 bg-slate-50/80 shrink-0">
                 {DAYS.map(day => (
                   <div key={day} className="py-2 md:py-4 text-center text-[9px] font-black text-slate-500 uppercase tracking-[0.15em] border-r border-slate-100 last:border-0">
@@ -298,7 +302,7 @@ const App: React.FC = () => {
                       key={`${date.toISOString()}-${idx}`}
                       onClick={() => setSelectedDate(date)}
                       className={`
-                        p-1 md:p-2 border-r border-b border-slate-100 cursor-pointer group transition-all relative flex flex-col items-center justify-between
+                        p-1 md:p-2 border-r border-b border-slate-100 cursor-pointer group transition-all duration-300 ease-out relative flex flex-col items-center justify-between
                         ${!isCurrentMonth ? 'bg-slate-50/40 opacity-20' : 'bg-white hover:bg-indigo-50/40'}
                         ${isSelected ? 'ring-2 md:ring-4 ring-inset ring-indigo-500/20 bg-indigo-50/30 z-10' : ''}
                       `}
@@ -323,7 +327,7 @@ const App: React.FC = () => {
                       <div className="flex-1 w-full flex items-center justify-center">
                         {shift && template ? (
                           <div className={`
-                            w-full h-full max-h-[80%] rounded-xl md:rounded-2xl border flex flex-col items-center justify-center shadow-sm relative overflow-hidden transition-all
+                            w-full h-full max-h-[80%] rounded-xl md:rounded-2xl border flex flex-col items-center justify-center shadow-sm relative overflow-hidden transition-all duration-300 ease-out
                             ${template.color} ${isSelected ? 'scale-105 shadow-md' : 'scale-100'}
                           `}>
                             <span className="text-base md:text-3xl filter drop-shadow-sm">{template.icon}</span>
@@ -365,7 +369,7 @@ const App: React.FC = () => {
                   const template = templates.find(t => t.id === shift.templateId);
                   if (!template) return null;
                   return (
-                    <div key={shift.id} className="bg-white p-4 rounded-3xl shadow-sm border border-slate-200 flex items-center gap-4 group hover:shadow-md transition-all">
+                    <div key={shift.id} className="bg-white p-4 rounded-3xl shadow-sm border border-slate-200 flex items-center gap-4 group hover:shadow-md transition-all duration-300 ease-out hover:-translate-y-0.5">
                       <div className="flex flex-col items-center justify-center bg-slate-50 w-14 h-14 md:w-16 md:h-16 rounded-2xl border border-slate-100 shrink-0">
                         <span className="text-[9px] font-black text-slate-400 uppercase">{format(parseISO(shift.date), 'MMM')}</span>
                         <span className="text-lg font-black text-slate-900 leading-none">{format(parseISO(shift.date), 'dd')}</span>
@@ -393,7 +397,7 @@ const App: React.FC = () => {
                           href={ExportService.getGoogleCalendarLink(shift, template)}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="p-2 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all border border-indigo-100 shadow-sm"
+                          className="p-2 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all duration-300 ease-out border border-indigo-100 shadow-sm"
                           title="Google Sync"
                         >
                           <ExternalLink size={16} />
@@ -413,21 +417,21 @@ const App: React.FC = () => {
         </div>
 
         {/* Mobile Template Selector Bar */}
-        <div className="md:hidden bg-white border-t border-slate-200 p-2 shrink-0 z-30">
-          <div className="flex items-center justify-around gap-1 overflow-x-auto custom-scrollbar py-1">
-            {templates.map(t => (
-              <button
-                key={t.id}
-                onClick={() => handleAddShift(t)}
-                className={`flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border transition-all ${t.color.split(' ')[0]} ${t.color.split(' ')[1]} border-transparent active:scale-90`}
-              >
+      <div className="md:hidden bg-white border-t border-slate-200 p-2 shrink-0 z-30">
+        <div className="flex items-center justify-around gap-1 overflow-x-auto custom-scrollbar py-1">
+          {templates.map(t => (
+            <button
+              key={t.id}
+              onClick={() => handleAddShift(t)}
+              className={`flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border transition-all duration-300 ease-out ${t.color.split(' ')[0]} ${t.color.split(' ')[1]} border-transparent active:scale-90`}
+            >
                 <span className="text-xl">{t.icon}</span>
                 <span className="text-[7px] font-black uppercase mt-0.5 tracking-tighter">{t.name.split(' ')[0]}</span>
               </button>
             ))}
             <button 
               onClick={() => ExportService.generateICS(shifts, templates)}
-              className="flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl bg-slate-900 text-white border border-transparent active:scale-90"
+              className="flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl bg-slate-900 text-white border border-transparent transition-all duration-300 ease-out active:scale-90"
             >
               <Download size={18} />
               <span className="text-[7px] font-black uppercase mt-0.5">Save</span>
@@ -475,20 +479,29 @@ const App: React.FC = () => {
 
       {/* Details Adjustment Panel */}
       {selectedDate && (
-        <div className="fixed bottom-20 md:bottom-10 right-2 md:right-10 z-40 w-[calc(100%-1rem)] md:w-80">
-          <div className="bg-white p-5 rounded-[2rem] shadow-[0_20px_80px_-20px_rgba(0,0,0,0.3)] border border-slate-200 animate-in slide-in-from-bottom-6 duration-300">
-            <div className="flex justify-between items-center mb-4">
+        <div className="fixed bottom-24 md:bottom-10 right-2 md:right-10 z-40 w-[calc(100%-1rem)] md:w-80">
+          <div className="bg-white/95 backdrop-blur p-5 rounded-[2rem] shadow-[0_20px_80px_-20px_rgba(0,0,0,0.3)] border border-slate-200 animate-in slide-in-from-bottom-6 duration-300">
+            <div className="flex justify-between items-center mb-3">
               <div className="flex flex-col">
                 <span className="font-black text-[9px] uppercase text-indigo-500 tracking-[0.2em] mb-0.5">Customize</span>
                 <span className="text-xs font-black text-slate-900">{format(selectedDate, 'EEEE, MMM dd')}</span>
               </div>
-              <button onClick={() => setSelectedDate(null)} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400"><X size={16} strokeWidth={3} /></button>
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+                  className="md:hidden p-1.5 hover:bg-slate-100 rounded-full text-slate-400 transition-all duration-300 ease-out"
+                  aria-label={isDetailsExpanded ? 'Collapse details' : 'Expand details'}
+                >
+                  <ChevronRight size={16} className={`transition-transform duration-300 ease-out ${isDetailsExpanded ? 'rotate-90' : '-rotate-90'}`} />
+                </button>
+                <button onClick={() => setSelectedDate(null)} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 transition-all duration-300 ease-out"><X size={16} strokeWidth={3} /></button>
+              </div>
             </div>
             
-            <div className="space-y-3">
+            <div className={`space-y-3 transition-all duration-300 ease-out overflow-hidden md:max-h-none md:opacity-100 ${isDetailsExpanded ? 'max-h-[60vh] opacity-100 overflow-y-auto pr-1' : 'max-h-0 opacity-0 md:opacity-100'}`}>
               <div 
                 onClick={() => setIsExtraHoursChecked(!isExtraHoursChecked)}
-                className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${isExtraHoursChecked ? 'bg-rose-50 border-rose-200 shadow-sm' : 'bg-slate-50 border-slate-100'}`}
+                className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-300 ease-out ${isExtraHoursChecked ? 'bg-rose-50 border-rose-200 shadow-sm' : 'bg-slate-50 border-slate-100'}`}
               >
                 <div className="flex items-center gap-2">
                   <div className={`w-5 h-5 rounded flex items-center justify-center transition-all ${isExtraHoursChecked ? 'bg-rose-600 text-white shadow-sm' : 'bg-white border border-slate-300 text-transparent'}`}>
@@ -507,7 +520,7 @@ const App: React.FC = () => {
                     <button
                       key={type}
                       onClick={() => setExtraHoursType(type as 'before' | 'after')}
-                      className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all ${extraHoursType === type ? 'bg-white shadow text-rose-600' : 'text-slate-500'}`}
+                      className={`flex-1 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest transition-all duration-300 ease-out ${extraHoursType === type ? 'bg-white shadow text-rose-600' : 'text-slate-500'}`}
                     >
                       {type}
                     </button>
@@ -517,7 +530,7 @@ const App: React.FC = () => {
 
               <div 
                 onClick={() => setSwapped(!swapped)}
-                className={`flex items-center justify-between p-3 rounded-2xl border transition-all ${swapped ? 'bg-amber-50 border-amber-200 shadow-sm' : 'bg-slate-50 border-slate-100'}`}
+                className={`flex items-center justify-between p-3 rounded-2xl border transition-all duration-300 ease-out ${swapped ? 'bg-amber-50 border-amber-200 shadow-sm' : 'bg-slate-50 border-slate-100'}`}
               >
                 <div className="flex items-center gap-2">
                     <div className={`w-5 h-5 rounded flex items-center justify-center transition-all ${swapped ? 'bg-amber-600 text-white shadow-sm' : 'bg-white border border-slate-300 text-transparent'}`}>
@@ -540,6 +553,17 @@ const App: React.FC = () => {
                     className="w-full p-3 bg-white border-2 border-slate-200 rounded-xl text-xs font-black text-slate-900 focus:border-indigo-500 outline-none placeholder:text-slate-300"
                   />
                 </div>
+              )}
+
+              {selectedShift && selectedTemplate && (
+                <a
+                  href={ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-lg transition-all duration-300 ease-out hover:bg-indigo-700"
+                >
+                  <ExternalLink size={14} /> Sync to Google Calendar
+                </a>
               )}
               
               <div className="text-[8px] text-slate-400 font-black uppercase text-center bg-slate-50 p-2 rounded-xl">
