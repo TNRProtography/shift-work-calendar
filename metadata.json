@@ -1,0 +1,7 @@
+{
+  "name": "ShiftFlow - Premium Shift Calendar",
+  "description": "A high-end calendar application designed specifically for shift workers, featuring advanced templating, shift swap tracking, and seamless export capabilities.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
