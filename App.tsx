@@ -32,7 +32,8 @@ import {
   Clock,
   ExternalLink,
   Zap,
-  CheckCircle2
+  CheckCircle2,
+  Settings
 } from 'lucide-react';
 
 import { ShiftEntry, ShiftTemplate, ViewType, ExtraHoursType } from './types';
@@ -76,6 +77,10 @@ const App: React.FC = () => {
     icon: '✨',
     color: 'bg-slate-100 text-slate-700 border-slate-200'
   });
+  const [isSyncMenuOpen, setIsSyncMenuOpen] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [lastSynced, setLastSynced] = useState<string | null>(null);
 
   // --- Initial Load ---
   useEffect(() => {
@@ -83,6 +88,7 @@ const App: React.FC = () => {
     const savedTemplates = StorageService.getTemplates(DEFAULT_TEMPLATES);
     setShifts(savedShifts);
     setTemplates(savedTemplates);
+    setLastSynced(StorageService.getLastSynced());
   }, []);
 
   // --- Persist ---
@@ -313,17 +319,40 @@ const App: React.FC = () => {
     setRestWarning(null);
   };
 
+  const handleSyncNow = () => {
+    setIsSyncing(true);
+    StorageService.pushToKV(shifts, templates);
+    const now = new Date().toISOString();
+    setLastSynced(now);
+    setSyncMessage('Synced to CAL_KV.');
+    setTimeout(() => setIsSyncing(false), 300);
+  };
+
+  const handlePullFromCloud = async () => {
+    setIsSyncing(true);
+    const result = await StorageService.pullFromKV(DEFAULT_TEMPLATES);
+    if (result) {
+      setShifts(result.shifts);
+      setTemplates(result.templates);
+      setSyncMessage('Loaded latest data from CAL_KV.');
+      setLastSynced(StorageService.getLastSynced());
+    } else {
+      setSyncMessage('No cloud data found yet.');
+    }
+    setTimeout(() => setIsSyncing(false), 300);
+  };
+
   return (
     <div className="h-full flex flex-col md:flex-row bg-slate-50 text-slate-900 overflow-hidden">
       
       {/* Sidebar (Desktop) */}
       <aside className="hidden md:flex w-80 bg-white border-r border-slate-200 p-6 flex-col gap-4 shadow-sm z-10 shrink-0 h-full">
-        <div className="flex items-center gap-3 mb-2">
-          <div className="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-100">
-            <CalendarIcon className="text-white w-5 h-5" />
+          <div className="flex items-center gap-3 mb-2">
+            <div className="bg-indigo-600 p-2 rounded-lg shadow-lg shadow-indigo-100">
+              <CalendarIcon className="text-white w-5 h-5" />
+            </div>
+            <h1 className="text-2xl font-black tracking-tight text-slate-900">Nicole&apos;s Working Life</h1>
           </div>
-          <h1 className="text-2xl font-black tracking-tight text-slate-900">ShiftFlow</h1>
-        </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-2">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Quick Templates</h3>
@@ -371,36 +400,85 @@ const App: React.FC = () => {
         
         {/* Top Header */}
         <header className="h-16 md:h-20 bg-white border-b border-slate-200 px-4 md:px-8 flex items-center justify-between shrink-0 sticky top-0 z-20">
-          <div className="flex items-center gap-2 md:gap-4">
-            <h2 className="text-base md:text-xl font-black text-slate-900 min-w-[100px]">
-              {format(currentMonth, 'MMMM yyyy')}
-            </h2>
-            <div className="flex items-center bg-slate-100 rounded-xl p-1">
-              <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-700">
-                <ChevronLeft size={16} />
-              </button>
-              <button onClick={() => setCurrentMonth(new Date())} className="px-2 text-[9px] font-black uppercase tracking-wider hover:bg-white hover:shadow-sm rounded-lg py-1 text-slate-900">
-                Today
-              </button>
-              <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-700">
-                <ChevronRight size={16} />
-              </button>
+          <div className="flex items-center gap-3 md:gap-5">
+            <div className="flex flex-col">
+              <span className="text-[10px] md:text-xs font-black uppercase tracking-[0.3em] text-slate-400">Calendar</span>
+              <h2 className="text-sm md:text-lg font-black text-slate-900">Nicole&apos;s Working Life</h2>
+            </div>
+            <div className="hidden md:block h-8 w-px bg-slate-200" />
+            <div className="flex items-center gap-2 md:gap-4">
+              <h3 className="text-base md:text-xl font-black text-slate-900 min-w-[100px]">
+                {format(currentMonth, 'MMMM yyyy')}
+              </h3>
+              <div className="flex items-center bg-slate-100 rounded-xl p-1">
+                <button onClick={() => setCurrentMonth(subMonths(currentMonth, 1))} className="p-1 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-700">
+                  <ChevronLeft size={16} />
+                </button>
+                <button onClick={() => setCurrentMonth(new Date())} className="px-2 text-[9px] font-black uppercase tracking-wider hover:bg-white hover:shadow-sm rounded-lg py-1 text-slate-900">
+                  Today
+                </button>
+                <button onClick={() => setCurrentMonth(addMonths(currentMonth, 1))} className="p-1 hover:bg-white hover:shadow-sm rounded-lg transition-all text-slate-700">
+                  <ChevronRight size={16} />
+                </button>
+              </div>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-slate-100 rounded-xl p-1">
-            <button 
-              onClick={() => setView('Month')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all ${view === 'Month' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
-            >
-              <LayoutGrid size={14} /> <span>Month</span>
-            </button>
-            <button 
-              onClick={() => setView('List')}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all ${view === 'List' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
-            >
-              <ClipboardList size={14} /> <span>Roster</span>
-            </button>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-1.5 bg-slate-100 rounded-xl p-1">
+              <button 
+                onClick={() => setView('Month')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all ${view === 'Month' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+              >
+                <LayoutGrid size={14} /> <span>Month</span>
+              </button>
+              <button 
+                onClick={() => setView('List')}
+                className={`flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] md:text-xs font-black transition-all ${view === 'List' ? 'bg-white shadow-sm text-indigo-600' : 'text-slate-500'}`}
+              >
+                <ClipboardList size={14} /> <span>Roster</span>
+              </button>
+            </div>
+
+            <div className="relative">
+              <button
+                onClick={() => setIsSyncMenuOpen((open) => !open)}
+                className="p-2 rounded-xl bg-slate-100 hover:bg-white hover:shadow-sm transition-all text-slate-600"
+                aria-label="Open sync settings"
+              >
+                <Settings size={16} />
+              </button>
+              {isSyncMenuOpen && (
+                <div className="absolute right-0 mt-2 w-64 bg-white border border-slate-200 rounded-2xl shadow-xl p-4 text-slate-700">
+                  <div className="flex items-center justify-between mb-2">
+                    <h4 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Sync</h4>
+                    <span className={`text-[10px] font-bold ${isSyncing ? 'text-indigo-600' : 'text-slate-400'}`}>
+                      {isSyncing ? 'Working...' : 'Ready'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mb-3">
+                    Last synced: {lastSynced ? format(parseISO(lastSynced), 'PPpp') : 'Never'}
+                  </p>
+                  {syncMessage && (
+                    <p className="text-[11px] text-indigo-600 font-semibold mb-3">{syncMessage}</p>
+                  )}
+                  <div className="flex flex-col gap-2">
+                    <button
+                      onClick={handleSyncNow}
+                      className="w-full py-2 rounded-xl bg-indigo-600 text-white text-xs font-bold hover:bg-indigo-700 transition-all"
+                    >
+                      Sync to CAL_KV
+                    </button>
+                    <button
+                      onClick={handlePullFromCloud}
+                      className="w-full py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                    >
+                      Pull from CAL_KV
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </header>
 
