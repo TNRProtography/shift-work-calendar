@@ -1,5 +1,5 @@
 
-import { ShiftTemplate } from './types';
+import { AppSettings, ShiftTemplate } from './types';
 
 export const DEFAULT_TEMPLATES: ShiftTemplate[] = [
   {
@@ -54,3 +54,12 @@ export const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
   'July', 'August', 'September', 'October', 'November', 'December'
 ];
+
+export const DEFAULT_SETTINGS: AppSettings = {
+  darkMode: false,
+  skin: 'default',
+  weekStartsOnMonday: false,
+  highlightWeekends: true,
+  compactMode: false,
+  reduceMotion: false
+};
