@@ -237,6 +237,18 @@ const App: React.FC = () => {
           >
             <Download size={16} /> Bulk Export .ICS
           </button>
+          <a
+            href={selectedShift && selectedTemplate ? ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate) : undefined}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-bold transition-all ${
+              selectedShift && selectedTemplate
+                ? 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-600 hover:text-white'
+                : 'bg-slate-100 text-slate-400 border-slate-200 pointer-events-none'
+            }`}
+          >
+            <ExternalLink size={16} /> Sync Selected to Google
+          </a>
         </div>
       </aside>
 
@@ -436,6 +448,19 @@ const App: React.FC = () => {
               <Download size={18} />
               <span className="text-[7px] font-black uppercase mt-0.5">Save</span>
             </button>
+            <a
+              href={selectedShift && selectedTemplate ? ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate) : undefined}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={`flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border transition-all duration-300 ease-out active:scale-90 ${
+                selectedShift && selectedTemplate
+                  ? 'bg-white text-indigo-600 border-indigo-100'
+                  : 'bg-slate-100 text-slate-400 border-slate-200 pointer-events-none'
+              }`}
+            >
+              <ExternalLink size={18} />
+              <span className="text-[7px] font-black uppercase mt-0.5">Sync</span>
+            </a>
           </div>
         </div>
       </main>
@@ -555,17 +580,6 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {selectedShift && selectedTemplate && (
-                <a
-                  href={ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate)}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-indigo-600 text-white font-black uppercase text-[10px] tracking-widest shadow-lg transition-all duration-300 ease-out hover:bg-indigo-700"
-                >
-                  <ExternalLink size={14} /> Sync to Google Calendar
-                </a>
-              )}
-              
               <div className="text-[8px] text-slate-400 font-black uppercase text-center bg-slate-50 p-2 rounded-xl">
                 Apply a shift template to save
               </div>
