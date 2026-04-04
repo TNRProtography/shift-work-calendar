@@ -54,6 +54,22 @@ body.skin-sunflower {
     radial-gradient(circle at 90% 80%, rgba(251, 191, 36, 0.3) 0 25%, transparent 26%);
 }
 
+body.skin-sunflower .bg-indigo-600 {
+  background-color: #d97706;
+}
+
+body.skin-sunflower .text-indigo-600 {
+  color: #b45309;
+}
+
+body.skin-sunflower .border-indigo-100 {
+  border-color: #fcd34d;
+}
+
+body.skin-sunflower .ring-indigo-500\/20 {
+  --tw-ring-color: rgb(217 119 6 / 0.2);
+}
+
 body.skin-black-dog {
   background-color: #f1f5f9;
   background-image:
@@ -61,6 +77,22 @@ body.skin-black-dog {
     radial-gradient(circle at 50px 60px, rgba(15, 23, 42, 0.25) 0 6px, transparent 7px),
     radial-gradient(circle at 80px 30px, rgba(15, 23, 42, 0.2) 0 5px, transparent 6px);
   background-size: 120px 120px;
+}
+
+body.skin-black-dog .bg-indigo-600 {
+  background-color: #0f172a;
+}
+
+body.skin-black-dog .text-indigo-600 {
+  color: #1e293b;
+}
+
+body.skin-black-dog .border-indigo-100 {
+  border-color: #cbd5e1;
+}
+
+body.skin-black-dog .ring-indigo-500\/20 {
+  --tw-ring-color: rgb(15 23 42 / 0.2);
 }
 
 body.skin-nursing {
@@ -72,6 +104,22 @@ body.skin-nursing {
     linear-gradient(315deg, rgba(14, 165, 233, 0.15) 25%, transparent 25%);
   background-position: 12px 0, 12px 0, 0 0, 0 0;
   background-size: 24px 24px;
+}
+
+body.skin-nursing .bg-indigo-600 {
+  background-color: #0ea5e9;
+}
+
+body.skin-nursing .text-indigo-600 {
+  color: #0369a1;
+}
+
+body.skin-nursing .border-indigo-100 {
+  border-color: #bae6fd;
+}
+
+body.skin-nursing .ring-indigo-500\/20 {
+  --tw-ring-color: rgb(14 165 233 / 0.2);
 }
 
 .skin-swatch {

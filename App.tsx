@@ -307,6 +307,8 @@ const App: React.FC = () => {
     if (!selectedDate || selectedDates.length === 0) return;
     if (isMultiSelectMode) {
       applyTemplateToDates(selectedDates, template.id);
+      setSelectedDates([]);
+      setSelectedDate(null);
       return;
     }
     setPendingTemplateId(template.id);
@@ -527,21 +529,28 @@ const App: React.FC = () => {
                 <Settings size={16} />
               </button>
               {isSyncMenuOpen && (
-                <div className="fixed inset-0 z-[70] md:absolute md:inset-auto md:right-0 md:mt-2 flex items-end md:block bg-slate-900/40 md:bg-transparent">
-                  <div className="w-full md:w-80 md:max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-t-3xl md:rounded-2xl shadow-xl p-4 text-slate-700 max-h-[85dvh] md:max-h-[70vh] overflow-y-auto custom-scrollbar">
+                <div
+                  className="fixed inset-0 z-[70] md:absolute md:inset-auto md:right-0 md:mt-2 flex items-end md:block bg-slate-900/40 md:bg-transparent"
+                  onClick={() => setIsSyncMenuOpen(false)}
+                >
+                  <div
+                    className="w-full md:w-80 md:max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-t-3xl md:rounded-2xl shadow-xl p-4 text-slate-700 max-h-[85dvh] md:max-h-[70vh] overflow-y-auto custom-scrollbar relative"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div className="md:hidden w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3" />
+                  <button
+                    onClick={() => setIsSyncMenuOpen(false)}
+                    className="absolute right-3 top-3 p-1.5 rounded-full text-slate-400 hover:bg-slate-100"
+                    aria-label="Close settings"
+                  >
+                    <X size={16} />
+                  </button>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Sync</h3>
                     <span className={`text-[10px] font-bold ${isSyncing ? 'text-indigo-600' : 'text-slate-400'}`}>
                       {isSyncing ? 'Working...' : 'Ready'}
                     </span>
                   </div>
-                  <button
-                    onClick={() => setIsSyncMenuOpen(false)}
-                    className="md:hidden mb-3 w-full py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600"
-                  >
-                    Close
-                  </button>
                   <p className="text-[11px] text-slate-500 mb-3">
                     Last synced: {lastSynced ? format(parseISO(lastSynced), 'PPpp') : 'Never'}
                   </p>
@@ -820,12 +829,12 @@ const App: React.FC = () => {
 
           {/* Mobile Template Selector Bar */}
           <div className="md:hidden bg-white border-t border-slate-200 p-2 shrink-0 z-30">
-            <div className="grid grid-cols-4 gap-2 py-1">
+            <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar py-1">
               {templates.map(t => (
                 <button
                   key={t.id}
                   onClick={() => handleAddShift(t)}
-                  className={`flex flex-col items-center justify-center min-h-[64px] rounded-2xl border transition-all duration-300 ease-out ${t.color.split(' ')[0]} ${t.color.split(' ')[1]} border-transparent active:scale-90 px-1`}
+                  className={`flex flex-col items-center justify-center min-h-[64px] min-w-[64px] rounded-2xl border transition-all duration-300 ease-out ${t.color.split(' ')[0]} ${t.color.split(' ')[1]} border-transparent active:scale-90 px-1`}
                 >
                   <span className="text-xl">{t.icon}</span>
                   <span className="text-[7px] font-black uppercase mt-0.5 tracking-tighter">{t.name.split(' ')[0]}</span>
@@ -833,7 +842,7 @@ const App: React.FC = () => {
               ))}
               <button 
                 onClick={() => ExportService.generateICS(shifts, templates)}
-                className="flex flex-col items-center justify-center min-h-[64px] rounded-2xl bg-slate-900 text-white border border-transparent transition-all duration-300 ease-out active:scale-90"
+                className="flex flex-col items-center justify-center min-h-[64px] min-w-[64px] rounded-2xl bg-slate-900 text-white border border-transparent transition-all duration-300 ease-out active:scale-90"
               >
                 <Download size={18} />
                 <span className="text-[7px] font-black uppercase mt-0.5">Save</span>
