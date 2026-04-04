@@ -454,14 +454,7 @@ const App: React.FC = () => {
 
   const isJsonView = typeof window !== 'undefined' && window.location.pathname === '/json';
   if (isJsonView) {
-    return (
-      <div className="min-h-dvh bg-slate-950 text-slate-100 p-4 md:p-8">
-        <h1 className="text-sm md:text-base font-black mb-3">ShiftFlow JSON Export</h1>
-        <pre className="text-[11px] md:text-xs whitespace-pre-wrap break-words bg-slate-900 border border-slate-700 rounded-xl p-4 overflow-auto">
-          {JSON.stringify(ExportService.buildJsonExport(shifts, templates), null, 2)}
-        </pre>
-      </div>
-    );
+    return <pre>{JSON.stringify(ExportService.buildJsonExport(shifts, templates), null, 2)}</pre>;
   }
 
   return (
