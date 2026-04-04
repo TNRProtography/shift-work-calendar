@@ -49,6 +49,8 @@ const App: React.FC = () => {
   const [templates, setTemplates] = useState<ShiftTemplate[]>(DEFAULT_TEMPLATES);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [view, setView] = useState<ViewType>('Month');
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   
@@ -147,6 +149,28 @@ const App: React.FC = () => {
     const dateStr = format(date, 'yyyy-MM-dd');
     return getShiftForDateStr(dateStr);
   }, [getShiftForDateStr]);
+
+  const toggleDateSelection = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+
+    if (!isMultiSelectMode) {
+      setSelectedDate(date);
+      setSelectedDates([dateStr]);
+      return;
+    }
+
+    setSelectedDate(date);
+    setSelectedDates(prev => {
+      if (prev.includes(dateStr)) {
+        const next = prev.filter(d => d !== dateStr);
+        if (next.length === 0) {
+          setSelectedDate(null);
+        }
+        return next;
+      }
+      return [...prev, dateStr].sort();
+    });
+  };
 
   const getAdjustedTimes = (dateStr: string, shift: Partial<ShiftEntry>, template: ShiftTemplate) => {
     let start = parseISO(`${dateStr}T${template.startTime}:00`);
@@ -286,7 +310,16 @@ const App: React.FC = () => {
     setExtraHoursType('after');
   };
 
-  const selectedShift = selectedDate ? getShiftForDate(selectedDate) : null;
+  useEffect(() => {
+    if (selectedDate) {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      setSelectedDates((prev) => (prev.includes(dateStr) ? prev : [dateStr]));
+    } else {
+      setSelectedDates([]);
+    }
+  }, [selectedDate]);
+
+  const selectedShift = selectedDates.length === 1 && selectedDate ? getShiftForDate(selectedDate) : null;
   const selectedTemplate = selectedShift ? templates.find(t => t.id === selectedShift.templateId) : null;
   const pendingTemplate = pendingTemplateId ? templates.find(t => t.id === pendingTemplateId) : null;
 
@@ -309,44 +342,48 @@ const App: React.FC = () => {
   }, [selectedDate, selectedShift]);
 
   const handleSaveShift = () => {
-    if (!selectedDate || !pendingTemplateId) return;
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const existing = getShiftForDateStr(dateStr);
+    if (!pendingTemplateId || selectedDates.length === 0) return;
     const finalExtraHours: ExtraHoursType = isExtraHoursChecked ? extraHoursType : 'none';
-    const restConflict = checkRestPeriod(dateStr, pendingTemplateId, shifts.filter(s => s.date !== dateStr));
 
-    if (restConflict) {
-      setRestWarning({
-        date: dateStr,
-        pendingTemplateId,
-        gapMinutes: restConflict.gap,
-        conflictType: restConflict.type,
-        neighborShift: restConflict.neighbor
-      });
-      return;
+    let draftShifts = [...shifts];
+    for (const dateStr of selectedDates) {
+      const existing = draftShifts.find(s => s.date === dateStr);
+      const restConflict = checkRestPeriod(dateStr, pendingTemplateId, draftShifts.filter(s => s.date !== dateStr));
+
+      if (restConflict) {
+        setRestWarning({
+          date: dateStr,
+          pendingTemplateId,
+          gapMinutes: restConflict.gap,
+          conflictType: restConflict.type,
+          neighborShift: restConflict.neighbor
+        });
+        return;
+      }
+
+      if (existing) {
+        const updatedShift: ShiftEntry = {
+          ...existing,
+          templateId: pendingTemplateId,
+          isSwapped: swapped,
+          swappedWith: swapped ? swappedWith : undefined,
+          extraHours: finalExtraHours
+        };
+        draftShifts = draftShifts.map(s => (s.id === existing.id ? updatedShift : s));
+      } else {
+        const newShift: ShiftEntry = {
+          id: crypto.randomUUID(),
+          templateId: pendingTemplateId,
+          date: dateStr,
+          isSwapped: swapped,
+          swappedWith: swapped ? swappedWith : undefined,
+          extraHours: finalExtraHours
+        };
+        draftShifts = [...draftShifts, newShift];
+      }
     }
 
-    if (existing) {
-      const updatedShift: ShiftEntry = {
-        ...existing,
-        templateId: pendingTemplateId,
-        isSwapped: swapped,
-        swappedWith: swapped ? swappedWith : undefined,
-        extraHours: finalExtraHours
-      };
-      setShifts(shifts.map(s => (s.id === existing.id ? updatedShift : s)));
-    } else {
-      const newShift: ShiftEntry = {
-        id: crypto.randomUUID(),
-        templateId: pendingTemplateId,
-        date: dateStr,
-        isSwapped: swapped,
-        swappedWith: swapped ? swappedWith : undefined,
-        extraHours: finalExtraHours
-      };
-      setShifts([...shifts, newShift]);
-    }
-
+    setShifts(draftShifts);
     setIsEditing(false);
     setOverwriteWarning(null);
     setRestWarning(null);
@@ -427,7 +464,25 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              onClick={() => {
+                setIsMultiSelectMode((prev) => {
+                  const next = !prev;
+                  if (!next && selectedDate) {
+                    setSelectedDates([format(selectedDate, 'yyyy-MM-dd')]);
+                  }
+                  return next;
+                });
+              }}
+              className={`px-3 py-2 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-wide transition-all ${
+                isMultiSelectMode
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-white hover:shadow-sm'
+              }`}
+            >
+              Multi {selectedDates.length > 1 ? `(${selectedDates.length})` : ''}
+            </button>
             <div className="flex items-center gap-1.5 bg-slate-100 rounded-xl p-1">
               <button 
                 onClick={() => setView('Month')}
@@ -628,13 +683,14 @@ const App: React.FC = () => {
                   const template = shift ? templates.find(t => t.id === shift.templateId) : null;
                   const isToday = isSameDay(date, new Date());
                   const isCurrentMonth = isSameMonth(date, currentMonth);
-                  const isSelected = selectedDate && isSameDay(date, selectedDate);
+                  const dateStr = format(date, 'yyyy-MM-dd');
+                  const isSelected = selectedDates.includes(dateStr);
                   const isWeekendDay = isWeekend(date);
 
                   return (
                     <div 
                       key={`${date.toISOString()}-${idx}`}
-                      onClick={() => setSelectedDate(date)}
+                      onClick={() => toggleDateSelection(date)}
                       className={`
                         p-1 md:p-2 border-r border-b border-slate-100 cursor-pointer group transition-all duration-300 ease-out relative flex flex-col items-center justify-between
                         ${!isCurrentMonth ? 'bg-slate-50/40 opacity-20' : 'bg-white hover:bg-indigo-50/40'}
@@ -940,13 +996,15 @@ const App: React.FC = () => {
       )}
 
       {/* Details Adjustment Panel */}
-      {selectedDate && (
+      {selectedDates.length > 0 && selectedDate && (
         <div className="fixed bottom-24 md:bottom-10 right-2 md:right-10 z-40 w-[calc(100%-1rem)] md:w-80">
           <div className="bg-white/95 backdrop-blur p-5 rounded-[2rem] shadow-[0_20px_80px_-20px_rgba(0,0,0,0.3)] border border-slate-200 animate-in slide-in-from-bottom-6 duration-300">
             <div className="flex justify-between items-center mb-3">
               <div className="flex flex-col">
                 <span className="font-black text-[9px] uppercase text-indigo-500 tracking-[0.2em] mb-0.5">Customize</span>
-                <span className="text-xs font-black text-slate-900">{format(selectedDate, 'EEEE, MMM dd')}</span>
+                <span className="text-xs font-black text-slate-900">
+                  {selectedDates.length > 1 ? `${selectedDates.length} days selected` : format(selectedDate, 'EEEE, MMM dd')}
+                </span>
               </div>
               <div className="flex items-center gap-1">
                 {selectedShift && (
@@ -976,7 +1034,15 @@ const App: React.FC = () => {
                 >
                   <ChevronRight size={16} className={`transition-transform duration-300 ease-out ${isDetailsExpanded ? 'rotate-90' : '-rotate-90'}`} />
                 </button>
-                <button onClick={() => setSelectedDate(null)} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 transition-all duration-300 ease-out"><X size={16} strokeWidth={3} /></button>
+                <button
+                  onClick={() => {
+                    setSelectedDate(null);
+                    setSelectedDates([]);
+                  }}
+                  className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 transition-all duration-300 ease-out"
+                >
+                  <X size={16} strokeWidth={3} />
+                </button>
               </div>
             </div>
             
@@ -1090,7 +1156,9 @@ const App: React.FC = () => {
               )}
               
               <div className="text-[8px] text-slate-400 font-black uppercase text-center bg-slate-50 p-2 rounded-xl">
-                Select a shift, adjust flags, then save.
+                {selectedDates.length > 1
+                  ? 'Pick one shift setup and save to all selected days.'
+                  : 'Select a shift, adjust flags, then save.'}
               </div>
             </div>
           </div>
