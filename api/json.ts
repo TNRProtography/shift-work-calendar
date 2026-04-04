@@ -24,12 +24,16 @@ const fetchKvValue = async (request: Request, key: string) => {
   const text = await response.text();
   if (!text) return null;
 
-  const parsed = JSON.parse(text) as KvResponse | unknown;
-  if (parsed && typeof parsed === 'object' && 'value' in parsed) {
-    return (parsed as KvResponse).value;
-  }
+  try {
+    const parsed = JSON.parse(text) as KvResponse | unknown;
+    if (parsed && typeof parsed === 'object' && 'value' in parsed) {
+      return (parsed as KvResponse).value;
+    }
 
-  return parsed;
+    return parsed;
+  } catch {
+    return null;
+  }
 };
 
 const toTemplates = (input: unknown): ShiftTemplate[] => {
