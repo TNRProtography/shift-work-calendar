@@ -31,7 +31,6 @@ import {
   Trash2,
   X,
   Clock,
-  ExternalLink,
   Zap,
   CheckCircle2,
   Settings
@@ -320,7 +319,6 @@ const App: React.FC = () => {
   }, [selectedDate]);
 
   const selectedShift = selectedDates.length === 1 && selectedDate ? getShiftForDate(selectedDate) : null;
-  const selectedTemplate = selectedShift ? templates.find(t => t.id === selectedShift.templateId) : null;
   const pendingTemplate = pendingTemplateId ? templates.find(t => t.id === pendingTemplateId) : null;
 
   useEffect(() => {
@@ -607,6 +605,15 @@ const App: React.FC = () => {
                   <div className="border-t border-slate-100 pt-3">
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Data</h3>
                     <button
+                      onClick={() => {
+                        setIsTemplateModalOpen(true);
+                        setIsSyncMenuOpen(false);
+                      }}
+                      className="w-full mb-2 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                    >
+                      Add Template
+                    </button>
+                    <button
                       onClick={handleFactoryReset}
                       className="w-full py-2 rounded-xl border border-rose-200 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-all"
                     >
@@ -635,12 +642,6 @@ const App: React.FC = () => {
               />
             ))}
           </div>
-          <button
-            onClick={() => setIsTemplateModalOpen(true)}
-            className="mt-4 w-full rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 py-3 text-[10px] font-black uppercase tracking-[0.3em] hover:border-indigo-300 hover:text-indigo-600 transition-all"
-          >
-            + Add Template
-          </button>
         </div>
 
         <div className="mt-auto pt-4 border-t border-slate-100 space-y-2">
@@ -650,18 +651,6 @@ const App: React.FC = () => {
           >
             <Download size={16} /> Bulk Export .ICS
           </button>
-          <a
-            href={selectedShift && selectedTemplate ? ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate) : undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-bold transition-all ${
-              selectedShift && selectedTemplate
-                ? 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-600 hover:text-white'
-                : 'bg-slate-100 text-slate-400 border-slate-200 pointer-events-none'
-            }`}
-          >
-            <ExternalLink size={16} /> Sync Selected to Google
-          </a>
         </div>
         </aside>
 
@@ -793,15 +782,6 @@ const App: React.FC = () => {
                       </div>
 
                       <div className="flex gap-1.5">
-                         <a 
-                          href={ExportService.getGoogleCalendarLink(shift, template)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all duration-300 ease-out border border-indigo-100 shadow-sm"
-                          title="Google Sync"
-                        >
-                          <ExternalLink size={16} />
-                        </a>
                         <button 
                           onClick={() => deleteShift(shift.id)}
                           className="p-2 text-slate-300 hover:text-rose-600 transition-all"
@@ -830,32 +810,12 @@ const App: React.FC = () => {
                 </button>
               ))}
               <button 
-                onClick={() => setIsTemplateModalOpen(true)}
-                className="flex flex-col items-center justify-center min-h-[64px] rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 transition-all duration-300 ease-out active:scale-90"
-              >
-                <span className="text-lg font-black">+</span>
-                <span className="text-[7px] font-black uppercase mt-0.5">Template</span>
-              </button>
-              <button 
                 onClick={() => ExportService.generateICS(shifts, templates)}
                 className="flex flex-col items-center justify-center min-h-[64px] rounded-2xl bg-slate-900 text-white border border-transparent transition-all duration-300 ease-out active:scale-90"
               >
                 <Download size={18} />
                 <span className="text-[7px] font-black uppercase mt-0.5">Save</span>
               </button>
-              <a
-                href={selectedShift && selectedTemplate ? ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate) : undefined}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`flex flex-col items-center justify-center min-h-[64px] rounded-2xl border transition-all duration-300 ease-out active:scale-90 ${
-                  selectedShift && selectedTemplate
-                    ? 'bg-white text-indigo-600 border-indigo-100'
-                    : 'bg-slate-100 text-slate-400 border-slate-200 pointer-events-none'
-                }`}
-              >
-                <ExternalLink size={18} />
-                <span className="text-[7px] font-black uppercase mt-0.5">Sync</span>
-              </a>
             </div>
           </div>
         </main>
