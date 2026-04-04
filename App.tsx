@@ -31,7 +31,6 @@ import {
   Trash2,
   X,
   Clock,
-  ExternalLink,
   Zap,
   CheckCircle2,
   Settings
@@ -49,6 +48,8 @@ const App: React.FC = () => {
   const [templates, setTemplates] = useState<ShiftTemplate[]>(DEFAULT_TEMPLATES);
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(new Date());
+  const [selectedDates, setSelectedDates] = useState<string[]>([]);
+  const [isMultiSelectMode, setIsMultiSelectMode] = useState(false);
   const [view, setView] = useState<ViewType>('Month');
   const [settings, setSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
   
@@ -148,6 +149,28 @@ const App: React.FC = () => {
     return getShiftForDateStr(dateStr);
   }, [getShiftForDateStr]);
 
+  const toggleDateSelection = (date: Date) => {
+    const dateStr = format(date, 'yyyy-MM-dd');
+
+    if (!isMultiSelectMode) {
+      setSelectedDate(date);
+      setSelectedDates([dateStr]);
+      return;
+    }
+
+    setSelectedDate(date);
+    setSelectedDates(prev => {
+      if (prev.includes(dateStr)) {
+        const next = prev.filter(d => d !== dateStr);
+        if (next.length === 0) {
+          setSelectedDate(null);
+        }
+        return next;
+      }
+      return [...prev, dateStr].sort();
+    });
+  };
+
   const getAdjustedTimes = (dateStr: string, shift: Partial<ShiftEntry>, template: ShiftTemplate) => {
     let start = parseISO(`${dateStr}T${template.startTime}:00`);
     let end = parseISO(`${dateStr}T${template.endTime}:00`);
@@ -225,8 +248,69 @@ const App: React.FC = () => {
     resetForm();
   };
 
+  const applyTemplateToDates = (
+    dateStrings: string[],
+    templateId: string,
+    options?: { isSwapped?: boolean; swappedWith?: string; extraHours?: ExtraHoursType; force?: boolean }
+  ) => {
+    const isSwappedValue = options?.isSwapped ?? false;
+    const swappedWithValue = options?.swappedWith ?? '';
+    const extraHoursValue = options?.extraHours ?? 'none';
+    const force = options?.force ?? false;
+    let draftShifts = [...shifts];
+
+    for (const dateStr of dateStrings) {
+      const existing = draftShifts.find(s => s.date === dateStr);
+      const restConflict = checkRestPeriod(dateStr, templateId, draftShifts.filter(s => s.date !== dateStr));
+
+      if (restConflict && !force) {
+        setRestWarning({
+          date: dateStr,
+          pendingTemplateId: templateId,
+          gapMinutes: restConflict.gap,
+          conflictType: restConflict.type,
+          neighborShift: restConflict.neighbor
+        });
+        return;
+      }
+
+      if (existing) {
+        const updatedShift: ShiftEntry = {
+          ...existing,
+          templateId,
+          isSwapped: isSwappedValue,
+          swappedWith: isSwappedValue ? swappedWithValue : undefined,
+          extraHours: extraHoursValue
+        };
+        draftShifts = draftShifts.map(s => (s.id === existing.id ? updatedShift : s));
+      } else {
+        draftShifts = [
+          ...draftShifts,
+          {
+            id: crypto.randomUUID(),
+            templateId,
+            date: dateStr,
+            isSwapped: isSwappedValue,
+            swappedWith: isSwappedValue ? swappedWithValue : undefined,
+            extraHours: extraHoursValue
+          }
+        ];
+      }
+    }
+
+    setShifts(draftShifts);
+    setOverwriteWarning(null);
+    setRestWarning(null);
+  };
+
   const handleAddShift = (template: ShiftTemplate) => {
-    if (!selectedDate) return;
+    if (!selectedDate || selectedDates.length === 0) return;
+    if (isMultiSelectMode) {
+      applyTemplateToDates(selectedDates, template.id);
+      setSelectedDates([]);
+      setSelectedDate(null);
+      return;
+    }
     setPendingTemplateId(template.id);
     setIsEditing(true);
     setIsDetailsExpanded(true);
@@ -286,8 +370,16 @@ const App: React.FC = () => {
     setExtraHoursType('after');
   };
 
-  const selectedShift = selectedDate ? getShiftForDate(selectedDate) : null;
-  const selectedTemplate = selectedShift ? templates.find(t => t.id === selectedShift.templateId) : null;
+  useEffect(() => {
+    if (selectedDate) {
+      const dateStr = format(selectedDate, 'yyyy-MM-dd');
+      setSelectedDates((prev) => (prev.includes(dateStr) ? prev : [dateStr]));
+    } else {
+      setSelectedDates([]);
+    }
+  }, [selectedDate]);
+
+  const selectedShift = selectedDates.length === 1 && selectedDate ? getShiftForDate(selectedDate) : null;
   const pendingTemplate = pendingTemplateId ? templates.find(t => t.id === pendingTemplateId) : null;
 
   useEffect(() => {
@@ -309,47 +401,14 @@ const App: React.FC = () => {
   }, [selectedDate, selectedShift]);
 
   const handleSaveShift = () => {
-    if (!selectedDate || !pendingTemplateId) return;
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const existing = getShiftForDateStr(dateStr);
+    if (!pendingTemplateId || selectedDates.length === 0) return;
     const finalExtraHours: ExtraHoursType = isExtraHoursChecked ? extraHoursType : 'none';
-    const restConflict = checkRestPeriod(dateStr, pendingTemplateId, shifts.filter(s => s.date !== dateStr));
-
-    if (restConflict) {
-      setRestWarning({
-        date: dateStr,
-        pendingTemplateId,
-        gapMinutes: restConflict.gap,
-        conflictType: restConflict.type,
-        neighborShift: restConflict.neighbor
-      });
-      return;
-    }
-
-    if (existing) {
-      const updatedShift: ShiftEntry = {
-        ...existing,
-        templateId: pendingTemplateId,
-        isSwapped: swapped,
-        swappedWith: swapped ? swappedWith : undefined,
-        extraHours: finalExtraHours
-      };
-      setShifts(shifts.map(s => (s.id === existing.id ? updatedShift : s)));
-    } else {
-      const newShift: ShiftEntry = {
-        id: crypto.randomUUID(),
-        templateId: pendingTemplateId,
-        date: dateStr,
-        isSwapped: swapped,
-        swappedWith: swapped ? swappedWith : undefined,
-        extraHours: finalExtraHours
-      };
-      setShifts([...shifts, newShift]);
-    }
-
+    applyTemplateToDates(selectedDates, pendingTemplateId, {
+      isSwapped: swapped,
+      swappedWith,
+      extraHours: finalExtraHours
+    });
     setIsEditing(false);
-    setOverwriteWarning(null);
-    setRestWarning(null);
   };
 
   const handleSyncNow = () => {
@@ -393,8 +452,13 @@ const App: React.FC = () => {
     setSyncMessage('Factory reset complete.');
   };
 
+  const isJsonView = typeof window !== 'undefined' && window.location.pathname === '/json';
+  if (isJsonView) {
+    return <pre>{JSON.stringify(ExportService.buildJsonExport(shifts, templates), null, 2)}</pre>;
+  }
+
   return (
-    <div className="h-full flex flex-col bg-slate-50 text-slate-900 overflow-hidden">
+    <div className="min-h-dvh flex flex-col bg-slate-50 text-slate-900 overflow-x-hidden">
       {/* Top Header */}
       <header className="bg-white border-b border-slate-200 px-4 md:px-8 py-3 md:py-4 sticky top-0 z-30">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -427,7 +491,25 @@ const App: React.FC = () => {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            <button
+              onClick={() => {
+                setIsMultiSelectMode((prev) => {
+                  const next = !prev;
+                  if (!next && selectedDate) {
+                    setSelectedDates([format(selectedDate, 'yyyy-MM-dd')]);
+                  }
+                  return next;
+                });
+              }}
+              className={`px-3 py-2 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-wide transition-all ${
+                isMultiSelectMode
+                  ? 'bg-indigo-600 text-white'
+                  : 'bg-slate-100 text-slate-600 hover:bg-white hover:shadow-sm'
+              }`}
+            >
+              Multi {selectedDates.length > 1 ? `(${selectedDates.length})` : ''}
+            </button>
             <div className="flex items-center gap-1.5 bg-slate-100 rounded-xl p-1">
               <button 
                 onClick={() => setView('Month')}
@@ -452,7 +534,22 @@ const App: React.FC = () => {
                 <Settings size={16} />
               </button>
               {isSyncMenuOpen && (
-                <div className="absolute right-0 mt-2 w-80 max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-2xl shadow-xl p-4 text-slate-700 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                <div
+                  className="fixed inset-0 z-[70] md:absolute md:inset-auto md:right-0 md:mt-2 flex items-end md:block bg-slate-900/40 md:bg-transparent"
+                  onClick={() => setIsSyncMenuOpen(false)}
+                >
+                  <div
+                    className="w-full md:w-80 md:max-w-[calc(100vw-2rem)] bg-white border border-slate-200 rounded-t-3xl md:rounded-2xl shadow-xl p-4 text-slate-700 max-h-[85dvh] md:max-h-[70vh] overflow-y-auto custom-scrollbar relative"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    <div className="md:hidden w-10 h-1 bg-slate-200 rounded-full mx-auto mb-3" />
+                  <button
+                    onClick={() => setIsSyncMenuOpen(false)}
+                    className="absolute right-3 top-3 p-1.5 rounded-full text-slate-400 hover:bg-slate-100"
+                    aria-label="Close settings"
+                  >
+                    <X size={16} />
+                  </button>
                   <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Sync</h3>
                     <span className={`text-[10px] font-bold ${isSyncing ? 'text-indigo-600' : 'text-slate-400'}`}>
@@ -544,12 +641,30 @@ const App: React.FC = () => {
                   <div className="border-t border-slate-100 pt-3">
                     <h3 className="text-xs font-black uppercase tracking-[0.2em] text-slate-400 mb-2">Data</h3>
                     <button
+                      onClick={() => {
+                        setIsTemplateModalOpen(true);
+                        setIsSyncMenuOpen(false);
+                      }}
+                      className="w-full mb-2 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-600 hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                    >
+                      Add Template
+                    </button>
+                    <a
+                      href="/json"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full mb-2 py-2 rounded-xl border border-slate-200 text-center text-xs font-bold text-slate-600 hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                    >
+                      Open /json Export
+                    </a>
+                    <button
                       onClick={handleFactoryReset}
                       className="w-full py-2 rounded-xl border border-rose-200 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-all"
                     >
                       Factory reset
                     </button>
                   </div>
+                </div>
                 </div>
               )}
             </div>
@@ -571,12 +686,6 @@ const App: React.FC = () => {
               />
             ))}
           </div>
-          <button
-            onClick={() => setIsTemplateModalOpen(true)}
-            className="mt-4 w-full rounded-2xl border-2 border-dashed border-slate-200 text-slate-500 py-3 text-[10px] font-black uppercase tracking-[0.3em] hover:border-indigo-300 hover:text-indigo-600 transition-all"
-          >
-            + Add Template
-          </button>
         </div>
 
         <div className="mt-auto pt-4 border-t border-slate-100 space-y-2">
@@ -586,18 +695,6 @@ const App: React.FC = () => {
           >
             <Download size={16} /> Bulk Export .ICS
           </button>
-          <a
-            href={selectedShift && selectedTemplate ? ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate) : undefined}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={`w-full flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-bold transition-all ${
-              selectedShift && selectedTemplate
-                ? 'bg-white text-indigo-600 border-indigo-100 hover:bg-indigo-600 hover:text-white'
-                : 'bg-slate-100 text-slate-400 border-slate-200 pointer-events-none'
-            }`}
-          >
-            <ExternalLink size={16} /> Sync Selected to Google
-          </a>
         </div>
         </aside>
 
@@ -628,13 +725,14 @@ const App: React.FC = () => {
                   const template = shift ? templates.find(t => t.id === shift.templateId) : null;
                   const isToday = isSameDay(date, new Date());
                   const isCurrentMonth = isSameMonth(date, currentMonth);
-                  const isSelected = selectedDate && isSameDay(date, selectedDate);
+                  const dateStr = format(date, 'yyyy-MM-dd');
+                  const isSelected = selectedDates.includes(dateStr);
                   const isWeekendDay = isWeekend(date);
 
                   return (
                     <div 
                       key={`${date.toISOString()}-${idx}`}
-                      onClick={() => setSelectedDate(date)}
+                      onClick={() => toggleDateSelection(date)}
                       className={`
                         p-1 md:p-2 border-r border-b border-slate-100 cursor-pointer group transition-all duration-300 ease-out relative flex flex-col items-center justify-between
                         ${!isCurrentMonth ? 'bg-slate-50/40 opacity-20' : 'bg-white hover:bg-indigo-50/40'}
@@ -728,15 +826,6 @@ const App: React.FC = () => {
                       </div>
 
                       <div className="flex gap-1.5">
-                         <a 
-                          href={ExportService.getGoogleCalendarLink(shift, template)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="p-2 text-indigo-600 hover:bg-indigo-600 hover:text-white rounded-xl transition-all duration-300 ease-out border border-indigo-100 shadow-sm"
-                          title="Google Sync"
-                        >
-                          <ExternalLink size={16} />
-                        </a>
                         <button 
                           onClick={() => deleteShift(shift.id)}
                           className="p-2 text-slate-300 hover:text-rose-600 transition-all"
@@ -753,44 +842,24 @@ const App: React.FC = () => {
 
           {/* Mobile Template Selector Bar */}
           <div className="md:hidden bg-white border-t border-slate-200 p-2 shrink-0 z-30">
-            <div className="flex items-center justify-around gap-1 overflow-x-auto custom-scrollbar py-1">
+            <div className="flex items-center gap-2 overflow-x-auto custom-scrollbar py-1">
               {templates.map(t => (
                 <button
                   key={t.id}
                   onClick={() => handleAddShift(t)}
-                  className={`flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border transition-all duration-300 ease-out ${t.color.split(' ')[0]} ${t.color.split(' ')[1]} border-transparent active:scale-90`}
+                  className={`flex flex-col items-center justify-center min-h-[64px] min-w-[64px] rounded-2xl border transition-all duration-300 ease-out ${t.color.split(' ')[0]} ${t.color.split(' ')[1]} border-transparent active:scale-90 px-1`}
                 >
                   <span className="text-xl">{t.icon}</span>
                   <span className="text-[7px] font-black uppercase mt-0.5 tracking-tighter">{t.name.split(' ')[0]}</span>
                 </button>
               ))}
               <button 
-                onClick={() => setIsTemplateModalOpen(true)}
-                className="flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border-2 border-dashed border-slate-200 text-slate-400 transition-all duration-300 ease-out active:scale-90"
-              >
-                <span className="text-lg font-black">+</span>
-                <span className="text-[7px] font-black uppercase mt-0.5">Template</span>
-              </button>
-              <button 
                 onClick={() => ExportService.generateICS(shifts, templates)}
-                className="flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl bg-slate-900 text-white border border-transparent transition-all duration-300 ease-out active:scale-90"
+                className="flex flex-col items-center justify-center min-h-[64px] min-w-[64px] rounded-2xl bg-slate-900 text-white border border-transparent transition-all duration-300 ease-out active:scale-90"
               >
                 <Download size={18} />
                 <span className="text-[7px] font-black uppercase mt-0.5">Save</span>
               </button>
-              <a
-                href={selectedShift && selectedTemplate ? ExportService.getGoogleCalendarLink(selectedShift, selectedTemplate) : undefined}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={`flex flex-col items-center justify-center min-w-[50px] aspect-square rounded-2xl border transition-all duration-300 ease-out active:scale-90 ${
-                  selectedShift && selectedTemplate
-                    ? 'bg-white text-indigo-600 border-indigo-100'
-                    : 'bg-slate-100 text-slate-400 border-slate-200 pointer-events-none'
-                }`}
-              >
-                <ExternalLink size={18} />
-                <span className="text-[7px] font-black uppercase mt-0.5">Sync</span>
-              </a>
             </div>
           </div>
         </main>
@@ -940,13 +1009,15 @@ const App: React.FC = () => {
       )}
 
       {/* Details Adjustment Panel */}
-      {selectedDate && (
+      {selectedDates.length > 0 && selectedDate && !isMultiSelectMode && (
         <div className="fixed bottom-24 md:bottom-10 right-2 md:right-10 z-40 w-[calc(100%-1rem)] md:w-80">
           <div className="bg-white/95 backdrop-blur p-5 rounded-[2rem] shadow-[0_20px_80px_-20px_rgba(0,0,0,0.3)] border border-slate-200 animate-in slide-in-from-bottom-6 duration-300">
             <div className="flex justify-between items-center mb-3">
               <div className="flex flex-col">
                 <span className="font-black text-[9px] uppercase text-indigo-500 tracking-[0.2em] mb-0.5">Customize</span>
-                <span className="text-xs font-black text-slate-900">{format(selectedDate, 'EEEE, MMM dd')}</span>
+                <span className="text-xs font-black text-slate-900">
+                  {selectedDates.length > 1 ? `${selectedDates.length} days selected` : format(selectedDate, 'EEEE, MMM dd')}
+                </span>
               </div>
               <div className="flex items-center gap-1">
                 {selectedShift && (
@@ -976,7 +1047,15 @@ const App: React.FC = () => {
                 >
                   <ChevronRight size={16} className={`transition-transform duration-300 ease-out ${isDetailsExpanded ? 'rotate-90' : '-rotate-90'}`} />
                 </button>
-                <button onClick={() => setSelectedDate(null)} className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 transition-all duration-300 ease-out"><X size={16} strokeWidth={3} /></button>
+                <button
+                  onClick={() => {
+                    setSelectedDate(null);
+                    setSelectedDates([]);
+                  }}
+                  className="p-1.5 hover:bg-slate-100 rounded-full text-slate-400 transition-all duration-300 ease-out"
+                >
+                  <X size={16} strokeWidth={3} />
+                </button>
               </div>
             </div>
             
@@ -1090,7 +1169,9 @@ const App: React.FC = () => {
               )}
               
               <div className="text-[8px] text-slate-400 font-black uppercase text-center bg-slate-50 p-2 rounded-xl">
-                Select a shift, adjust flags, then save.
+                {selectedDates.length > 1
+                  ? 'Pick one shift setup and save to all selected days.'
+                  : 'Select a shift, adjust flags, then save.'}
               </div>
             </div>
           </div>
