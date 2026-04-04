@@ -248,8 +248,67 @@ const App: React.FC = () => {
     resetForm();
   };
 
+  const applyTemplateToDates = (
+    dateStrings: string[],
+    templateId: string,
+    options?: { isSwapped?: boolean; swappedWith?: string; extraHours?: ExtraHoursType; force?: boolean }
+  ) => {
+    const isSwappedValue = options?.isSwapped ?? false;
+    const swappedWithValue = options?.swappedWith ?? '';
+    const extraHoursValue = options?.extraHours ?? 'none';
+    const force = options?.force ?? false;
+    let draftShifts = [...shifts];
+
+    for (const dateStr of dateStrings) {
+      const existing = draftShifts.find(s => s.date === dateStr);
+      const restConflict = checkRestPeriod(dateStr, templateId, draftShifts.filter(s => s.date !== dateStr));
+
+      if (restConflict && !force) {
+        setRestWarning({
+          date: dateStr,
+          pendingTemplateId: templateId,
+          gapMinutes: restConflict.gap,
+          conflictType: restConflict.type,
+          neighborShift: restConflict.neighbor
+        });
+        return;
+      }
+
+      if (existing) {
+        const updatedShift: ShiftEntry = {
+          ...existing,
+          templateId,
+          isSwapped: isSwappedValue,
+          swappedWith: isSwappedValue ? swappedWithValue : undefined,
+          extraHours: extraHoursValue
+        };
+        draftShifts = draftShifts.map(s => (s.id === existing.id ? updatedShift : s));
+      } else {
+        draftShifts = [
+          ...draftShifts,
+          {
+            id: crypto.randomUUID(),
+            templateId,
+            date: dateStr,
+            isSwapped: isSwappedValue,
+            swappedWith: isSwappedValue ? swappedWithValue : undefined,
+            extraHours: extraHoursValue
+          }
+        ];
+      }
+    }
+
+    setShifts(draftShifts);
+    setOverwriteWarning(null);
+    setRestWarning(null);
+  };
+
   const handleAddShift = (template: ShiftTemplate) => {
-    if (!selectedDate) return;
+    if (!selectedDate || selectedDates.length === 0) return;
+    if (isMultiSelectMode) {
+      applyTemplateToDates(selectedDates, template.id);
+      return;
+    }
     setPendingTemplateId(template.id);
     setIsEditing(true);
     setIsDetailsExpanded(true);
@@ -342,49 +401,12 @@ const App: React.FC = () => {
   const handleSaveShift = () => {
     if (!pendingTemplateId || selectedDates.length === 0) return;
     const finalExtraHours: ExtraHoursType = isExtraHoursChecked ? extraHoursType : 'none';
-
-    let draftShifts = [...shifts];
-    for (const dateStr of selectedDates) {
-      const existing = draftShifts.find(s => s.date === dateStr);
-      const restConflict = checkRestPeriod(dateStr, pendingTemplateId, draftShifts.filter(s => s.date !== dateStr));
-
-      if (restConflict) {
-        setRestWarning({
-          date: dateStr,
-          pendingTemplateId,
-          gapMinutes: restConflict.gap,
-          conflictType: restConflict.type,
-          neighborShift: restConflict.neighbor
-        });
-        return;
-      }
-
-      if (existing) {
-        const updatedShift: ShiftEntry = {
-          ...existing,
-          templateId: pendingTemplateId,
-          isSwapped: swapped,
-          swappedWith: swapped ? swappedWith : undefined,
-          extraHours: finalExtraHours
-        };
-        draftShifts = draftShifts.map(s => (s.id === existing.id ? updatedShift : s));
-      } else {
-        const newShift: ShiftEntry = {
-          id: crypto.randomUUID(),
-          templateId: pendingTemplateId,
-          date: dateStr,
-          isSwapped: swapped,
-          swappedWith: swapped ? swappedWith : undefined,
-          extraHours: finalExtraHours
-        };
-        draftShifts = [...draftShifts, newShift];
-      }
-    }
-
-    setShifts(draftShifts);
+    applyTemplateToDates(selectedDates, pendingTemplateId, {
+      isSwapped: swapped,
+      swappedWith,
+      extraHours: finalExtraHours
+    });
     setIsEditing(false);
-    setOverwriteWarning(null);
-    setRestWarning(null);
   };
 
   const handleSyncNow = () => {
@@ -965,7 +987,7 @@ const App: React.FC = () => {
       )}
 
       {/* Details Adjustment Panel */}
-      {selectedDates.length > 0 && selectedDate && (
+      {selectedDates.length > 0 && selectedDate && !isMultiSelectMode && (
         <div className="fixed bottom-24 md:bottom-10 right-2 md:right-10 z-40 w-[calc(100%-1rem)] md:w-80">
           <div className="bg-white/95 backdrop-blur p-5 rounded-[2rem] shadow-[0_20px_80px_-20px_rgba(0,0,0,0.3)] border border-slate-200 animate-in slide-in-from-bottom-6 duration-300">
             <div className="flex justify-between items-center mb-3">
