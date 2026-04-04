@@ -1,6 +1,6 @@
 
 import { ShiftEntry, ShiftTemplate } from '../types';
-import { format, parseISO, addHours, subHours } from 'date-fns';
+import { format, parseISO, addHours, subHours, startOfDay } from 'date-fns';
 
 export const ExportService = {
   getAdjustedTimes: (shift: ShiftEntry, template: ShiftTemplate) => {
@@ -21,10 +21,18 @@ export const ExportService = {
     return { start, end };
   },
 
+  getFutureShifts: (shifts: ShiftEntry[]) => {
+    const today = startOfDay(new Date());
+    return shifts
+      .filter((shift) => parseISO(shift.date) >= today)
+      .sort((a, b) => a.date.localeCompare(b.date));
+  },
+
   generateICS: (shifts: ShiftEntry[], templates: ShiftTemplate[]) => {
+    const futureShifts = ExportService.getFutureShifts(shifts);
     let icsContent = "BEGIN:VCALENDAR\nVERSION:2.0\nPRODID:-//ShiftFlow//Calendar Export//EN\n";
 
-    shifts.forEach(shift => {
+    futureShifts.forEach(shift => {
       const template = templates.find(t => t.id === shift.templateId);
       if (!template) return;
 
@@ -56,10 +64,53 @@ export const ExportService = {
     const blob = new Blob([icsContent], { type: 'text/calendar;charset=utf-8' });
     const link = document.createElement('a');
     link.href = window.URL.createObjectURL(blob);
-    link.setAttribute('download', 'shiftflow_roster.ics');
+    const firstDate = futureShifts[0]?.date ?? format(new Date(), 'yyyy-MM-dd');
+    const lastDate = futureShifts[futureShifts.length - 1]?.date ?? firstDate;
+    link.setAttribute('download', `Nicoles Shifts - ${firstDate}-${lastDate}.ics`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+  },
+
+  buildJsonExport: (shifts: ShiftEntry[], templates: ShiftTemplate[]) => {
+    const futureShifts = ExportService.getFutureShifts(shifts);
+    return {
+      generatedAt: new Date().toISOString(),
+      calendarName: 'Nicoles Shifts',
+      range: {
+        from: futureShifts[0]?.date ?? null,
+        to: futureShifts[futureShifts.length - 1]?.date ?? null
+      },
+      events: futureShifts
+        .map((shift) => {
+          const template = templates.find((t) => t.id === shift.templateId);
+          if (!template) return null;
+          const { start, end } = ExportService.getAdjustedTimes(shift, template);
+          const allDay = template.type === 'Sick' || template.type === 'Annual';
+          const summary = `${template.icon} ${template.name}${shift.isSwapped ? ' (Swapped)' : ''}${shift.extraHours !== 'none' ? ' + Extra' : ''}`;
+
+          return {
+            id: shift.id,
+            date: shift.date,
+            allDay,
+            start: allDay ? `${shift.date}T00:00:00` : format(start, "yyyy-MM-dd'T'HH:mm:ss"),
+            end: allDay ? format(addHours(parseISO(shift.date), 24), "yyyy-MM-dd'T'00:00:00") : format(end, "yyyy-MM-dd'T'HH:mm:ss"),
+            summary,
+            description: `ShiftFlow Entry. Swapped: ${shift.isSwapped ? 'Yes' : 'No'}. ${shift.swappedWith ? 'With: ' + shift.swappedWith : ''}`,
+            template: {
+              id: template.id,
+              name: template.name,
+              type: template.type,
+              startTime: template.startTime,
+              endTime: template.endTime
+            },
+            swapped: shift.isSwapped,
+            swappedWith: shift.swappedWith ?? null,
+            extraHours: shift.extraHours
+          };
+        })
+        .filter((entry): entry is NonNullable<typeof entry> => Boolean(entry))
+    };
   },
 
   getGoogleCalendarLink: (shift: ShiftEntry, template: ShiftTemplate) => {

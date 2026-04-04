@@ -452,6 +452,18 @@ const App: React.FC = () => {
     setSyncMessage('Factory reset complete.');
   };
 
+  const isJsonView = typeof window !== 'undefined' && window.location.pathname === '/json';
+  if (isJsonView) {
+    return (
+      <div className="min-h-dvh bg-slate-950 text-slate-100 p-4 md:p-8">
+        <h1 className="text-sm md:text-base font-black mb-3">ShiftFlow JSON Export</h1>
+        <pre className="text-[11px] md:text-xs whitespace-pre-wrap break-words bg-slate-900 border border-slate-700 rounded-xl p-4 overflow-auto">
+          {JSON.stringify(ExportService.buildJsonExport(shifts, templates), null, 2)}
+        </pre>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-dvh flex flex-col bg-slate-50 text-slate-900 overflow-x-hidden">
       {/* Top Header */}
@@ -644,6 +656,14 @@ const App: React.FC = () => {
                     >
                       Add Template
                     </button>
+                    <a
+                      href="/json"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block w-full mb-2 py-2 rounded-xl border border-slate-200 text-center text-xs font-bold text-slate-600 hover:border-indigo-200 hover:text-indigo-600 transition-all"
+                    >
+                      Open /json Export
+                    </a>
                     <button
                       onClick={handleFactoryReset}
                       className="w-full py-2 rounded-xl border border-rose-200 text-xs font-bold text-rose-600 hover:bg-rose-50 transition-all"
